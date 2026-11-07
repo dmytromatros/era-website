@@ -1,9 +1,15 @@
 'use client'
 
 import { Text } from '@react-three/drei'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
+import { useEffect, useRef, type ReactNode } from 'react'
+import type * as THREE from 'three'
 import type { ElementSpec, TextStyle } from '@/experience/measure'
+import { useExperience } from '@/experience/store'
+import { isInternal } from '@/lib/href'
 import { fontFor } from '@/theme/typography'
 import { Slab } from './Slab'
+import { useFrontTextMaterial } from './textMaterial'
 
 const DEPTH = 0.05
 
@@ -32,8 +38,10 @@ function Label({
   position: [number, number, number]
   anchor: 'top-left' | 'center'
 }) {
+  const material = useFrontTextMaterial()
   return (
     <Text
+      material={material}
       font={fontFor(style.fontWeight)}
       fontSize={style.fontSize * k}
       letterSpacing={style.letterSpacing}
@@ -51,6 +59,70 @@ function Label({
   )
 }
 
+/** Follow an element's 2D link from 3D: internal pages via the router (with the ripple), others natively. */
+function follow(href: string) {
+  const { navigate, ripple } = useExperience.getState()
+  if (isInternal(href) && navigate) {
+    ripple()
+    navigate(href)
+  } else {
+    window.location.href = href
+  }
+}
+
+/**
+ * Makes an element do what its 2D original does when it is a link: click to follow, pointer
+ * cursor, and a small lift on hover so it reads as alive. Only once the 3D world has taken over —
+ * before that the DOM button sits exactly on top and handles the click itself.
+ */
+function Linked({ href, children }: { href?: string; children: ReactNode }) {
+  const group = useRef<THREE.Group>(null)
+  const hovered = useRef(false)
+  const lift = useRef(0)
+
+  useEffect(
+    () => () => {
+      if (hovered.current) document.body.style.cursor = ''
+    },
+    [],
+  )
+
+  useFrame((_, delta) => {
+    const g = group.current
+    if (!g || !href) return
+    lift.current += ((hovered.current ? 1 : 0) - lift.current) * (1 - Math.exp(-delta * 12))
+    g.position.z = lift.current * 0.08
+    g.scale.setScalar(1 + lift.current * 0.04)
+  })
+
+  if (!href) return <>{children}</>
+
+  const live = () => useExperience.getState().handedOver
+  return (
+    <group
+      ref={group}
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        if (!live()) return
+        e.stopPropagation()
+        follow(href)
+      }}
+      onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+        if (!live()) return
+        e.stopPropagation()
+        hovered.current = true
+        document.body.style.cursor = 'pointer'
+      }}
+      onPointerOut={() => {
+        if (!hovered.current) return
+        hovered.current = false
+        document.body.style.cursor = ''
+      }}
+    >
+      {children}
+    </group>
+  )
+}
+
 /** A measured 2D element rebuilt in 3D, centred on its origin. Same size, font and colours. */
 export function ElementView({ spec, k, onSync }: Props) {
   const w = spec.width * k
@@ -60,15 +132,17 @@ export function ElementView({ spec, k, onSync }: Props) {
 
   if (spec.kind === 'text') {
     return (
-      <Label
-        text={spec.text}
-        style={spec.style}
-        k={k}
-        maxWidth={w + slack}
-        onSync={onSync}
-        position={[-w / 2, h / 2, 0]}
-        anchor="top-left"
-      />
+      <Linked href={spec.href}>
+        <Label
+          text={spec.text}
+          style={spec.style}
+          k={k}
+          maxWidth={w + slack}
+          onSync={onSync}
+          position={[-w / 2, h / 2, 0]}
+          anchor="top-left"
+        />
+      </Linked>
     )
   }
 
@@ -76,7 +150,7 @@ export function ElementView({ spec, k, onSync }: Props) {
   const border = box.borderColor ? k : 0
   const radius = Math.min(box.radius * k, h / 2, w / 2)
   return (
-    <group>
+    <Linked href={spec.href}>
       {border > 0 && (
         <group position-z={-0.002}>
           <Slab width={w} height={h} radius={radius} depth={DEPTH * 0.9}>
@@ -105,7 +179,7 @@ export function ElementView({ spec, k, onSync }: Props) {
           ))
         )}
       </group>
-    </group>
+    </Linked>
   )
 }
 

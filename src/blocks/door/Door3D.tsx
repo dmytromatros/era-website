@@ -10,6 +10,7 @@ import { useTheme } from '@/theme/store'
 import { FONT_BOLD } from '@/theme/typography'
 import { htmlPortal } from '@/world/htmlPortal'
 import { timeline } from '@/world/timeline'
+import { useFrontTextMaterial } from '@/world/textMaterial'
 import type { Custom3DProps } from '../types'
 import styles from './Door3D.module.css'
 
@@ -47,6 +48,7 @@ const portalFragment = /* glsl */ `
 export function Door3D({ block, locale, station, index, timing }: Custom3DProps) {
   const theme = useTheme()
   const [active, setActive] = useState(false)
+  const labelMaterial = useFrontTextMaterial()
   const hover = useRef(0)
   const hovered = useRef(false)
   // Own the material (see Membrane.tsx for why not <shaderMaterial uniforms={…}>).
@@ -139,6 +141,7 @@ export function Door3D({ block, locale, station, index, timing }: Custom3DProps)
       </mesh>
 
       <Text
+        material={labelMaterial}
         font={FONT_BOLD}
         fontSize={0.42}
         anchorX="center"

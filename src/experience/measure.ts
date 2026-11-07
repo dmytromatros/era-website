@@ -36,6 +36,8 @@ export interface ElementSpec extends Rect {
   style: TextStyle
   box?: { background: string; borderColor?: string; radius: number }
   parts: PartSpec[]
+  /** Where the element links to in 2D (already localised), so its 3D copy can do the same. */
+  href?: string
 }
 
 /** blockIndex → its elements */
@@ -92,6 +94,9 @@ function measureElement(el: HTMLElement): ElementSpec {
     style: textStyle(cs),
     parts: [],
   }
+  const link = el.closest('a')
+  const href = link?.getAttribute('href')
+  if (href) spec.href = href
   if (kind !== 'text') {
     const borderWidth = parseFloat(cs.borderTopWidth)
     spec.box = {
