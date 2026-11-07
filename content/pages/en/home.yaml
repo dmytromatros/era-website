@@ -52,14 +52,15 @@ blocks:
   - type: steps
     heading: Want to know how to start?
     items:
-      - title: 01 · You apply
-        text: Apply on this site, and our manager will connect with you to chat about your project idea.
-      - title: 02 · Budget & timelines
+      # Texts from dfrnc.netlify.app (locales/en.json); the number 01–04 comes from the order.
+      - title: You apply
+        text: Apply on this site, and our manager will connect with you to chat about your project idea. It's that easy!
+      - title: We set project budget and timelines
         text: After we lock in the details together, expect your project proposal and invoice.
-      - title: 03 · Relax
-        text: As we craft your dream product, chill out. Your manager keeps you in the loop.
-      - title: 04 · Delivery
-        text: After our touch-up, your product is all set to work for you and bring in profit!
+      - title: Relax, we've got your project now!
+        text: As we craft your dream product, chill out. Your project manager keeps you in the loop every step of the way!
+      - title: "Delivery: Your Final Product Arrives!"
+        text: After our touch-up, your product is all set to do its thing—work for you and bring in profit!
     helpers:
       - target: step-1
         actor: ada

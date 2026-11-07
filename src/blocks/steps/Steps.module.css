@@ -1,0 +1,59 @@
+/*
+ * Step cards in the look of dfrnc.netlify.app ("01 / You apply / …"): big number, title,
+ * text on a white rounded card. Their animations (chat, toggles, drawing) are not ported —
+ * only the text goes into 3D. Font weights 400 / 500 / 700 / 800 only (3D has those files).
+ */
+
+.grid {
+  display: grid;
+  /* As on dfrnc: 4 in a row, 2×2 on narrower screens, 1 column on phones (never 3 + 1). */
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+  padding: 46px 24px 32px;
+  border-radius: 24px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+}
+
+.number {
+  margin: 0 0 48px;
+  font-size: 56px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.title {
+  margin: 0 0 14px;
+  font-size: 27px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.text {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.7;
+}
