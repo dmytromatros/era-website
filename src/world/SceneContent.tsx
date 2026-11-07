@@ -19,6 +19,7 @@ import { buildOffice } from './officeModel'
 import { Office } from './Office'
 import { officeStyle } from './officeStyle'
 import { planTiming, routePlan } from './route'
+import { moduleRailRange } from './widgetZone'
 
 const VISIBLE_HEIGHT =
   2 * ENTRANCE_GEOMETRY.heroDistance * Math.tan(THREE.MathUtils.degToRad(ENTRANCE_GEOMETRY.fov / 2))
@@ -93,6 +94,7 @@ export function SceneContent({ scene }: { scene: SceneData }) {
               station={station}
               stopIndex={i}
               timing={timing}
+              zone={moduleRailRange(plan, timing, stop.blockIndex)!}
               actors={actors}
               k={k}
               showElements={stop.blockIndex !== 0}

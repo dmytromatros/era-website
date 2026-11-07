@@ -132,7 +132,7 @@ export function PageView({ scene }: { scene: SceneData }) {
     }
   }, [mode, scene.key, segments])
 
-  const props = { locale: scene.locale, actors: scene.actors }
+  const props = { locale: scene.locale }
   return (
     <main ref={main} className={styles.main}>
       {hero && <Block2D block={hero} index={0} {...props} />}

@@ -1,11 +1,10 @@
 import Link from 'next/link'
 import type { HeroBlock } from '@/content/schema'
 import { isInternal, localizeHref } from '@/lib/href'
-import { HelperNotes } from '../HelperNotes'
 import type { Block2DProps } from '../types'
 import styles from './Hero.module.css'
 
-export function Hero2D({ block, index, locale, actors }: Block2DProps<HeroBlock>) {
+export function Hero2D({ block, index, locale }: Block2DProps<HeroBlock>) {
   return (
     <section className={styles.hero} data-hero data-block={index}>
       <div className={styles.inner}>
@@ -56,7 +55,6 @@ export function Hero2D({ block, index, locale, actors }: Block2DProps<HeroBlock>
             ))}
           </ul>
         )}
-        <HelperNotes helpers={block.helpers} actors={actors} />
       </div>
       <p className={styles.scrollHint} aria-hidden>
         Scroll to enter

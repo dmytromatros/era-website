@@ -53,14 +53,19 @@ blocks:
     heading: Want to know how to start?
     items:
       # Texts from dfrnc.netlify.app (locales/en.json); the number 01–04 comes from the order.
+      # widget: a live animation (simple look-alike of dfrnc's), drawn in 2D and on the 3D card.
       - title: You apply
         text: Apply on this site, and our manager will connect with you to chat about your project idea. It's that easy!
+        widget: chat
       - title: We set project budget and timelines
         text: After we lock in the details together, expect your project proposal and invoice.
+        widget: toggles
       - title: Relax, we've got your project now!
         text: As we craft your dream product, chill out. Your project manager keeps you in the loop every step of the way!
+        widget: mockup
       - title: "Delivery: Your Final Product Arrives!"
         text: After our touch-up, your product is all set to do its thing—work for you and bring in profit!
+        widget: delivery
     helpers:
       - target: step-1
         actor: ada

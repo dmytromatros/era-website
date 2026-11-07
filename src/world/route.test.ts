@@ -3,6 +3,7 @@ import type { Page } from '@/content/schema'
 import { ARCH, at, forward, layoutRoute, right, type Box, type Vec3 } from './layout'
 import { planTiming, routePlan, TRANSITION_WAYPOINTS } from './route'
 import { dwellEase, ENTRANCE, scrollToUnits, timeline, totalUnits } from './timeline'
+import { moduleRailRange, ZONE_FADE, ZONE_MARGIN, zoneOpacity } from './widgetZone'
 
 const hero = { type: 'hero' as const, heading: ['Hi'], actions: [], tags: [], helpers: [] }
 const cards = {
@@ -186,5 +187,32 @@ describe('stairs and raised floors', () => {
 
   it('the CTA and the door share one mezzanine slab', () => {
     expect(layout.architecture.mezzanines).toHaveLength(1)
+  })
+})
+
+describe('widget zones (widgets animate only inside their own module)', () => {
+  const zone = moduleRailRange(plan, timing, 2)! // the steps module
+  const cardsZone = moduleRailRange(plan, timing, 1)!
+
+  it('spans exactly the stops of the module', () => {
+    const rails = plan.stops.flatMap((s, i) => (s.blockIndex === 2 ? [timing.stopRail[i]!] : []))
+    expect(zone).toEqual({ from: Math.min(...rails), to: Math.max(...rails) })
+  })
+
+  it('is fully shown at its stops and hidden at every stop of the previous module', () => {
+    expect(zoneOpacity(zone.from, zone)).toBe(1)
+    expect(zoneOpacity(zone.to, zone)).toBe(1)
+    for (let r = cardsZone.from; r <= cardsZone.to; r++) expect(zoneOpacity(r, zone)).toBe(0)
+  })
+
+  it('fades in before the first stop and out after the last', () => {
+    expect(zoneOpacity(zone.from - ZONE_MARGIN + ZONE_FADE / 2, zone)).toBeCloseTo(0.5)
+    expect(zoneOpacity(zone.to + ZONE_MARGIN - ZONE_FADE / 2, zone)).toBeCloseTo(0.5)
+    expect(zoneOpacity(zone.from - ZONE_MARGIN, zone)).toBe(0)
+    expect(zoneOpacity(zone.to + ZONE_MARGIN, zone)).toBe(0)
+  })
+
+  it('does not exist for a module without stops', () => {
+    expect(moduleRailRange(plan, timing, 99)).toBeNull()
   })
 })

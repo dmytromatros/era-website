@@ -1,13 +1,13 @@
 import type { StepsBlock } from '@/content/schema'
-import { HelperNotes } from '../HelperNotes'
 import s from '../Section.module.css'
 import type { Block2DProps } from '../types'
+import { WidgetCanvas } from '../widgets/WidgetCanvas'
 import st from './Steps.module.css'
 
 /** Step number as on dfrnc: 01, 02, … — derived from the order, not written in content. */
 const stepNumber = (i: number) => String(i + 1).padStart(2, '0')
 
-export function Steps2D({ block, index, actors }: Block2DProps<StepsBlock>) {
+export function Steps2D({ block, index }: Block2DProps<StepsBlock>) {
   return (
     <section className={s.section} data-block={index}>
       <h2 className={s.heading} data-el="heading" data-kind="text">
@@ -25,10 +25,10 @@ export function Steps2D({ block, index, actors }: Block2DProps<StepsBlock>) {
             <p className={st.text} data-part>
               {item.text}
             </p>
+            {item.widget && <WidgetCanvas name={item.widget} />}
           </li>
         ))}
       </ol>
-      <HelperNotes helpers={block.helpers} actors={actors} />
     </section>
   )
 }

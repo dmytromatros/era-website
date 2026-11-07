@@ -28,6 +28,11 @@ export interface PartSpec extends Rect {
   style: TextStyle
 }
 
+/** A live canvas widget inside a card (`data-widget`). Rect relative to the card's top-left. */
+export interface WidgetSpec extends Rect {
+  name: string
+}
+
 export interface ElementSpec extends Rect {
   /** Element id inside its module (`heading`, `card-2`, …). Rect is in viewport px. */
   id: string
@@ -36,6 +41,8 @@ export interface ElementSpec extends Rect {
   style: TextStyle
   box?: { background: string; borderColor?: string; radius: number }
   parts: PartSpec[]
+  /** Live widgets inside a card: their 3D copy is the same canvas drawing on the card. */
+  widgets?: WidgetSpec[]
   /** Where the element links to in 2D (already localised), so its 3D copy can do the same. */
   href?: string
 }
@@ -126,6 +133,11 @@ function measureElement(el: HTMLElement): ElementSpec {
         style: textStyle(getComputedStyle(part)),
       }
     })
+    const widgets = [...el.querySelectorAll<HTMLElement>('[data-widget]')].map((w) => {
+      const r = w.getBoundingClientRect()
+      return { name: w.dataset.widget!, x: r.left - rect.left, y: r.top - rect.top, width: r.width, height: r.height }
+    })
+    if (widgets.length) spec.widgets = widgets
   }
   return spec
 }

@@ -1,9 +1,8 @@
 import type { CardsBlock } from '@/content/schema'
-import { HelperNotes } from '../HelperNotes'
 import s from '../Section.module.css'
 import type { Block2DProps } from '../types'
 
-export function Cards2D({ block, index, actors }: Block2DProps<CardsBlock>) {
+export function Cards2D({ block, index }: Block2DProps<CardsBlock>) {
   return (
     <section className={s.section} data-block={index}>
       <h2 className={s.heading} data-el="heading" data-kind="text">
@@ -26,7 +25,6 @@ export function Cards2D({ block, index, actors }: Block2DProps<CardsBlock>) {
           </li>
         ))}
       </ul>
-      <HelperNotes helpers={block.helpers} actors={actors} />
     </section>
   )
 }

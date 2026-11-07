@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { ActorDef, Block, BlockType, DoorBlock } from '@/content/schema'
+import type { Block, BlockType, DoorBlock } from '@/content/schema'
 import type { StationLayout } from '@/world/layout'
 import type { Timing } from '@/world/route'
 
@@ -10,7 +10,6 @@ export interface Block2DProps<B extends Block = Block> {
   /** Position of the module on the page — written to `data-block` so 3D can find its elements. */
   index: number
   locale: string
-  actors: Record<string, ActorDef>
 }
 
 /**

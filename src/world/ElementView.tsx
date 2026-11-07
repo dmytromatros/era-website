@@ -10,6 +10,7 @@ import { isInternal } from '@/lib/href'
 import { fontFor } from '@/theme/typography'
 import { Slab } from './Slab'
 import { useFrontTextMaterial } from './textMaterial'
+import { WidgetPlane } from './WidgetPlane'
 
 const DEPTH = 0.05
 
@@ -185,6 +186,14 @@ export function ElementView({ spec, k, onSync }: Props) {
             />
           ))
         )}
+        {spec.widgets?.map((widget, i) => (
+          <WidgetPlane
+            key={i}
+            widget={widget}
+            k={k}
+            position={[-w / 2 + (widget.x + widget.width / 2) * k, h / 2 - (widget.y + widget.height / 2) * k, -0.001]}
+          />
+        ))}
       </group>
     </Linked>
   )

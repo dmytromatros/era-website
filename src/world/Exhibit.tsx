@@ -7,12 +7,15 @@ import type { ExhibitModel } from './exhibitModel'
 import { Helper } from './Helper'
 import type { StationLayout } from './layout'
 import type { Timing } from './route'
+import { WidgetZoneContext, type RailRange } from './widgetZone'
 
 interface Props {
   model: ExhibitModel
   station: StationLayout
   stopIndex: number
   timing: Timing
+  /** Rail range of this exhibit's module — where its live widgets animate. */
+  zone: RailRange
   actors: Record<string, ActorDef>
   k: number
   /** Hero elements are drawn by <HeroTransit> (they fly in from the 2D page). */
@@ -20,7 +23,7 @@ interface Props {
 }
 
 /** One stop of the journey: a group of page elements standing in space, plus its helpers. */
-export function Exhibit({ model, station, stopIndex, timing, actors, k, showElements }: Props) {
+export function Exhibit({ model, station, stopIndex, timing, zone, actors, k, showElements }: Props) {
   const { world } = useTheme()
   const office = world.office
   return (
@@ -46,12 +49,15 @@ export function Exhibit({ model, station, stopIndex, timing, actors, k, showElem
           </group>
         ))}
 
-      {showElements &&
-        model.elements.map(({ spec, local }) => (
-          <group key={spec.id} position={local}>
-            <ElementView spec={spec} k={k} />
-          </group>
-        ))}
+      {showElements && (
+        <WidgetZoneContext.Provider value={{ zone, timing }}>
+          {model.elements.map(({ spec, local }) => (
+            <group key={spec.id} position={local}>
+              <ElementView spec={spec} k={k} />
+            </group>
+          ))}
+        </WidgetZoneContext.Provider>
+      )}
 
       {model.helpers.map((placed, i) => {
         const actor = actors[placed.helper.actor]

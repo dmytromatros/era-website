@@ -1,7 +1,13 @@
 /* Shared look of the content modules. Only font weights 400 / 500 / 700 / 800 (3D has those files). */
 
+/*
+ * Same column as the hero: content at most 1200px wide, at least a gutter from the edges.
+ * `width: 100%` matters — in the page grid, auto margins would otherwise shrink every
+ * section to its content and each would start at a different left edge.
+ */
 .section {
-  max-width: 1200px;
+  width: 100%;
+  max-width: calc(1200px + 2 * var(--gutter));
   margin: 0 auto;
   padding: 96px var(--gutter);
 }
@@ -14,13 +20,26 @@
   letter-spacing: -0.02em;
 }
 
+/* 4 in a row, 2×2 on narrower screens, 1 column on phones (never 3 + 1). */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {

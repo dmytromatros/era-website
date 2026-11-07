@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ACCESSORIES, ACTIVITIES } from '@/actors/catalog'
+import { WIDGETS } from '@/blocks/widgets/catalog'
 
 /* ------------------------------------------------------------------ */
 /* Shared bits                                                         */
@@ -89,7 +90,16 @@ export const cardsBlockSchema = z.object({
 export const stepsBlockSchema = z.object({
   type: z.literal('steps'),
   heading: z.string().min(1),
-  items: z.array(z.object({ title: z.string().min(1), text: z.string().min(1) })).min(1),
+  items: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        text: z.string().min(1),
+        /** Optional live widget (canvas animation) under the text — src/blocks/widgets. */
+        widget: z.enum(WIDGETS).optional(),
+      }),
+    )
+    .min(1),
   ...stage,
 })
 
