@@ -40,9 +40,24 @@ export const exhibitSchema = z.object({
   key: z.boolean().default(true),
 })
 
+/**
+ * How the route treats a module in 3D. Optional — every module type has defaults
+ * (src/world/route.ts): cards/steps are corridors, a turn before each corridor, stairs up
+ * before a CTA.
+ */
+export const routeSchema = z
+  .object({
+    /** `corridor` = walls on both sides; `open` = no walls. */
+    shape: z.enum(['open', 'corridor']).optional(),
+    /** What happens on the way INTO this module. */
+    before: z.enum(['straight', 'left', 'right', 'stairs-up', 'stairs-down']).optional(),
+  })
+  .optional()
+
 const stage = {
   helpers: z.array(helperSchema).default([]),
   exhibits: z.array(exhibitSchema).optional(),
+  route: routeSchema,
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,6 +106,7 @@ export const doorBlockSchema = z.object({
   type: z.literal('door'),
   label: z.string().min(1),
   href,
+  route: routeSchema,
 })
 
 export const blockSchema = z.discriminatedUnion('type', [
@@ -110,6 +126,7 @@ export type Block = z.infer<typeof blockSchema>
 export type BlockType = Block['type']
 export type Helper = z.infer<typeof helperSchema>
 export type ExhibitDef = z.infer<typeof exhibitSchema>
+export type RouteHint = z.infer<typeof routeSchema>
 
 /* ------------------------------------------------------------------ */
 /* Pages                                                               */

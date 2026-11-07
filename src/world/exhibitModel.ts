@@ -39,6 +39,11 @@ export interface ExhibitModel {
   height: number
   /** Bottom of the elements above the floor (for the floor shadow). */
   elevation: number
+  /**
+   * Where the two legs of a display stand go (local x), so floating elements stand on something.
+   * `null` when a character holds the group up instead.
+   */
+  stand: [number, number] | null
 }
 
 /**
@@ -48,7 +53,7 @@ export interface ExhibitModel {
  */
 export function buildExhibit(specs: ElementSpec[], ids: string[], helpers: Helper[], k: number): ExhibitModel {
   const members = ids.map((id) => specs.find((s) => s.id === id)).filter((s): s is ElementSpec => !!s)
-  if (!members.length) return { elements: [], helpers: [], width: 1, height: 1, elevation: 0 }
+  if (!members.length) return { elements: [], helpers: [], width: 1, height: 1, elevation: 0, stand: null }
 
   const minX = Math.min(...members.map((s) => s.x))
   const maxX = Math.max(...members.map((s) => s.x + s.width))
@@ -107,6 +112,9 @@ export function buildExhibit(specs: ElementSpec[], ids: string[], helpers: Helpe
     // Leave room above side helpers for their speech bubble.
     height: Math.max(elevation + height, sideHelpers ? BODY.height + 1.5 : placed.length ? BODY.height + 0.6 : 0),
     elevation,
+    stand: mine.some((h) => h.pose === 'holding')
+      ? null
+      : [shift - width / 2 + Math.min(0.25, width / 4), shift + width / 2 - Math.min(0.25, width / 4)],
   }
 }
 

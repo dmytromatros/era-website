@@ -9,7 +9,7 @@ import { isInternal, localizeHref } from '@/lib/href'
 import { useTheme } from '@/theme/store'
 import { FONT_BOLD } from '@/theme/typography'
 import { htmlPortal } from '@/world/htmlPortal'
-import { stopRailIndex, timeline } from '@/world/timeline'
+import { timeline } from '@/world/timeline'
 import type { Custom3DProps } from '../types'
 import styles from './Door3D.module.css'
 
@@ -44,7 +44,7 @@ const portalFragment = /* glsl */ `
 `
 
 /** A doorway to another page. Click it (or the button when close) to go through. */
-export function Door3D({ block, locale, station, index, stops }: Custom3DProps) {
+export function Door3D({ block, locale, station, index, timing }: Custom3DProps) {
   const theme = useTheme()
   const [active, setActive] = useState(false)
   const hover = useRef(0)
@@ -80,7 +80,7 @@ export function Door3D({ block, locale, station, index, stops }: Custom3DProps) 
     uniforms.uTime.value = clock.elapsedTime
     hover.current += ((hovered.current ? 1 : 0) - hover.current) * (1 - Math.exp(-delta * 6))
     uniforms.uHover.value = hover.current
-    const gap = Math.abs(timeline(live.progress, stops).railIndex - stopRailIndex(index))
+    const gap = Math.abs(timeline(live.progress, timing.segments).railIndex - timing.stopRail[index]!)
     const next = gap < ACTIVE_GAP
     if (next !== active) setActive(next)
   })

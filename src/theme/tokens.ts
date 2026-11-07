@@ -28,6 +28,8 @@ export interface Theme {
     floor: string
     floorDot: string
     platform: string
+    /** Corridor walls. */
+    wall: string
     sign: string
     hemiSky: string
     hemiGround: string
@@ -36,6 +38,29 @@ export interface Theme {
     sunIntensity: number
     shadow: string
     shadowOpacity: number
+    /** The office the route runs through (see world/office.ts). */
+    office: {
+      ceiling: string
+      light: string
+      window: string
+      wood: string
+      woodDark: string
+      frame: string
+      metal: string
+      fabricA: string
+      fabricB: string
+      plant: string
+      plantDark: string
+      pot: string
+      screen: string
+      bookA: string
+      bookB: string
+      bookC: string
+      glass: string
+      glassOpacity: number
+      frosted: string
+      frostedOpacity: number
+    }
   }
 }
 
@@ -57,9 +82,10 @@ const light: Theme = {
     background: '#f4f4f2',
     fogNear: 14,
     fogFar: 48,
-    floor: '#efefec',
-    floorDot: '#c2c2bc',
+    floor: '#e9e1d4',
+    floorDot: '#d6cab8',
     platform: '#ffffff',
+    wall: '#fafaf8',
     sign: '#111111',
     hemiSky: '#ffffff',
     hemiGround: '#d8d8d2',
@@ -68,6 +94,28 @@ const light: Theme = {
     sunIntensity: 1.4,
     shadow: '#000000',
     shadowOpacity: 0.16,
+    office: {
+      ceiling: '#fbfbf9',
+      light: '#ffffff',
+      window: '#eef4fb',
+      wood: '#d9c4a3',
+      woodDark: '#a8865e',
+      frame: '#2b2b2e',
+      metal: '#e6e6e3',
+      fabricA: '#a9b8a3',
+      fabricB: '#d8c9b5',
+      plant: '#6f9a64',
+      plantDark: '#4f7a4a',
+      pot: '#f3efe8',
+      screen: '#1d2026',
+      bookA: '#3b6cf6',
+      bookB: '#e8b04b',
+      bookC: '#d9705a',
+      glass: '#dfeaf2',
+      glassOpacity: 0.18,
+      frosted: '#f7f7f5',
+      frostedOpacity: 0.72,
+    },
   },
 }
 
@@ -93,6 +141,7 @@ const dark: Theme = {
     floor: '#121418',
     floorDot: '#2f333b',
     platform: '#1b1e24',
+    wall: '#16181d',
     sign: '#f2f2f0',
     hemiSky: '#8fa2ff',
     hemiGround: '#101215',
@@ -101,6 +150,28 @@ const dark: Theme = {
     sunIntensity: 1.1,
     shadow: '#000000',
     shadowOpacity: 0.45,
+    office: {
+      ceiling: '#15171b',
+      light: '#fff3d6',
+      window: '#1a2440',
+      wood: '#5a4632',
+      woodDark: '#3d2f22',
+      frame: '#0a0b0d',
+      metal: '#3a3d44',
+      fabricA: '#3f4a3d',
+      fabricB: '#4a4136',
+      plant: '#355a33',
+      plantDark: '#243f23',
+      pot: '#2a2c31',
+      screen: '#6c8cff',
+      bookA: '#6c8cff',
+      bookB: '#b88a3b',
+      bookC: '#a45444',
+      glass: '#8fa2ff',
+      glassOpacity: 0.1,
+      frosted: '#2a2d34',
+      frostedOpacity: 0.6,
+    },
   },
 }
 

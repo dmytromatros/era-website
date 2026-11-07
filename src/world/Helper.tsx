@@ -10,7 +10,8 @@ import { useTheme } from '@/theme/store'
 import type { PlacedHelper } from './exhibitModel'
 import { htmlPortal } from './htmlPortal'
 import { SpeechBubble } from './SpeechBubble'
-import { stopRailIndex, timeline, type StopTiming } from './timeline'
+import type { Timing } from './route'
+import { timeline } from './timeline'
 import styles from './Helper.module.css'
 
 /**
@@ -24,18 +25,18 @@ interface Props {
   placed: PlacedHelper
   actor: ActorDef
   stopIndex: number
-  stops: StopTiming[]
+  timing: Timing
 }
 
 /** A character working next to an element; talks when the camera stops at its exhibit. */
-export function Helper({ placed, actor, stopIndex, stops }: Props) {
+export function Helper({ placed, actor, stopIndex, timing }: Props) {
   const theme = useTheme()
   const [attentive, setAttentive] = useState(false)
   const [talking, setTalking] = useState(false)
   const near = useRef(false)
 
   useFrame(() => {
-    const gap = Math.abs(timeline(live.progress, stops).railIndex - stopRailIndex(stopIndex))
+    const gap = Math.abs(timeline(live.progress, timing.segments).railIndex - timing.stopRail[stopIndex]!)
     const next = near.current ? gap < FORGET : gap < NOTICE
     if (next !== near.current) {
       near.current = next

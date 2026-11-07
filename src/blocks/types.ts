@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import type { ActorDef, Block, BlockType, DoorBlock } from '@/content/schema'
 import type { StationLayout } from '@/world/layout'
+import type { Timing } from '@/world/route'
 
 export type BlockOf<T extends BlockType> = Extract<Block, { type: T }>
 
@@ -23,11 +24,8 @@ export interface Custom3DProps {
   block: DoorBlock
   locale: string
   station: StationLayout
+  /** Stop index (see world/stops.ts). */
   index: number
-  stops: StopInfo[]
-}
-
-/** Per-stop timing info, needed to know when the camera is at a given stop. */
-export interface StopInfo {
-  key: boolean
+  /** Scroll timing of the page's route — to know when the camera is at this stop. */
+  timing: Timing
 }

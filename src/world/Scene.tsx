@@ -4,7 +4,6 @@ import { Canvas } from '@react-three/fiber'
 import { ENTRANCE_GEOMETRY } from './layout'
 import { useExperience } from '@/experience/store'
 import { Atmosphere } from './Atmosphere'
-import { Decor } from './Decor'
 import { Driver } from './Driver'
 import { Effects } from './effects/Effects'
 import { Floor } from './Floor'
@@ -35,7 +34,6 @@ export function Scene() {
         <Driver />
         <Atmosphere />
         <Floor />
-        <Decor />
         {scene && <SceneContent key={scene.key} scene={scene} />}
         <Effects />
       </Canvas>

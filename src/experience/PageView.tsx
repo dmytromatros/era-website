@@ -6,7 +6,7 @@ import { registry2d } from '@/blocks/registry2d'
 import type { Block2DProps } from '@/blocks/types'
 import type { Block } from '@/content/schema'
 import { useThemeStore } from '@/theme/store'
-import { pageStops } from '@/world/stops'
+import { planTiming, routePlan } from '@/world/route'
 import { scrollToUnits, totalUnits } from '@/world/timeline'
 import { measurePage } from './measure'
 import { live, useExperience, type SceneData } from './store'
@@ -29,7 +29,7 @@ export function PageView({ scene }: { scene: SceneData }) {
   const theme = useThemeStore((s) => s.name)
   const main = useRef<HTMLElement>(null)
   const [hero, ...rest] = scene.page.blocks
-  const stops = useMemo(() => pageStops(scene.page), [scene.page])
+  const segments = useMemo(() => planTiming(routePlan(scene.page)).segments, [scene.page])
 
   useEffect(() => {
     useExperience.getState().setScene(scene)
@@ -50,9 +50,13 @@ export function PageView({ scene }: { scene: SceneData }) {
     }
     run()
     void document.fonts.ready.then(run)
+    // Again once CSS colour transitions (theme switch, 0.3 s) have finished — measuring mid-way
+    // would freeze a half-faded colour into the 3D copy.
+    const late = window.setTimeout(run, 450)
     window.addEventListener('resize', run)
     return () => {
       cancelAnimationFrame(frame)
+      window.clearTimeout(late)
       window.removeEventListener('resize', run)
     }
   }, [mode, scene.key, theme])
@@ -62,7 +66,7 @@ export function PageView({ scene }: { scene: SceneData }) {
     if (mode !== '3d') return
     const update = () => {
       const max = document.documentElement.scrollHeight - window.innerHeight
-      live.scroll = scrollToUnits(window.scrollY, max, stops)
+      live.scroll = scrollToUnits(window.scrollY, max, segments)
       live.scrollPx = window.scrollY
       // The 2D → 3D handover itself is decided inside the canvas frame (world/Driver.tsx).
     }
@@ -73,7 +77,7 @@ export function PageView({ scene }: { scene: SceneData }) {
       window.removeEventListener('scroll', update)
       window.removeEventListener('resize', update)
     }
-  }, [mode, stops, scene.key])
+  }, [mode, segments, scene.key])
 
   const props = { locale: scene.locale, actors: scene.actors }
   return (
@@ -85,7 +89,7 @@ export function PageView({ scene }: { scene: SceneData }) {
         ))}
       </div>
       {/* In 3D mode the document is just a scroll track; the canvas shows the content. */}
-      <div className={styles.track} style={{ height: `${(totalUnits(stops) + 1) * 100}vh` }} aria-hidden />
+      <div className={styles.track} style={{ height: `${(totalUnits(segments) + 1) * 100}vh` }} aria-hidden />
     </main>
   )
 }

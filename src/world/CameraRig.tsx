@@ -5,12 +5,13 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { live } from '@/experience/store'
 import { ENTRANCE_GEOMETRY, type WorldLayout } from './layout'
-import { timeline, type StopTiming } from './timeline'
+import type { Timing } from './route'
+import { timeline } from './timeline'
 
 const toVectors = (points: WorldLayout['rail']) => points.map((p) => new THREE.Vector3(...p))
 
 /** Moves the camera along the rail according to scroll. */
-export function CameraRig({ layout, stops }: { layout: WorldLayout; stops: StopTiming[] }) {
+export function CameraRig({ layout, timing }: { layout: WorldLayout; timing: Timing }) {
   const camera = useThree((s) => s.camera)
   const { rail, look } = useMemo(
     () => ({
@@ -34,7 +35,7 @@ export function CameraRig({ layout, stops }: { layout: WorldLayout; stops: StopT
   useFrame(() => {
     // `live.progress` is already smoothed (world/Driver.tsx); a second smoothing here would
     // make the camera lag behind the elements and the film.
-    const t = timeline(live.progress, stops)
+    const t = timeline(live.progress, timing.segments)
     const c = current.current
     c.index = t.railIndex
 

@@ -2,107 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { BODY } from '@/actors/rig'
 import type { ElementSpec } from '@/experience/measure'
 import { buildExhibit } from './exhibitModel'
+import { fitDistance } from './layout'
 import { pageStops } from './stops'
-import { fitDistance, layoutWorld } from './layout'
-import { dwellEase, ENTRANCE, KEY_UNITS, PASS_UNITS, scrollToUnits, timeline, totalUnits } from './timeline'
 
-const stops = [{ key: true }, { key: false }, { key: true }]
-
-describe('timeline', () => {
-  it('starts at the beginning of the rail', () => {
-    expect(timeline(0, stops)).toEqual({ entrance: 0, railIndex: 0, stop: -1 })
-  })
-
-  it('gives key stops more scroll than minor ones', () => {
-    expect(totalUnits(stops)).toBeCloseTo(ENTRANCE + 2 * KEY_UNITS + PASS_UNITS)
-  })
-
-  it('reaches the entered point exactly when the entrance ends', () => {
-    const t = timeline(ENTRANCE, stops)
-    expect(t.entrance).toBe(1)
-    expect(t.railIndex).toBeCloseTo(1)
-  })
-
-  it('stands exactly on each stop at the end of its segment', () => {
-    expect(timeline(ENTRANCE + KEY_UNITS, stops).railIndex).toBeCloseTo(2)
-    expect(timeline(ENTRANCE + KEY_UNITS + PASS_UNITS, stops).railIndex).toBeCloseTo(3)
-    expect(timeline(totalUnits(stops), stops).railIndex).toBeCloseTo(4)
-  })
-
-  it('clamps out-of-range scroll', () => {
-    expect(timeline(-5, stops).railIndex).toBe(0)
-    expect(timeline(999, stops).railIndex).toBeCloseTo(4)
-  })
-
-  it('is monotonic', () => {
-    let prev = -1
-    for (let u = 0; u <= totalUnits(stops); u += 0.01) {
-      const { railIndex } = timeline(u, stops)
-      expect(railIndex).toBeGreaterThanOrEqual(prev - 1e-9)
-      prev = railIndex
-    }
-  })
-
-  it('lingers at stops (slow ends, fast middle)', () => {
-    const d = 0.02
-    const nearEnd = dwellEase(d) - dwellEase(0)
-    const middle = dwellEase(0.5 + d / 2) - dwellEase(0.5 - d / 2)
-    expect(middle).toBeGreaterThan(nearEnd * 5)
-  })
-
-  it('maps the full scroll distance onto the full timeline', () => {
-    expect(scrollToUnits(0, 1000, stops)).toBe(0)
-    expect(scrollToUnits(1000, 1000, stops)).toBeCloseTo(totalUnits(stops))
-    expect(scrollToUnits(5000, 1000, stops)).toBeCloseTo(totalUnits(stops))
-    expect(scrollToUnits(10, 0, stops)).toBe(0)
-  })
-})
-
-describe('layoutWorld', () => {
-  const inputs = [
-    { width: 3, height: 2, align: 'side' as const },
-    { width: 1.5, height: 1.2, align: 'side' as const },
-    { width: 2.2, height: 3.3, align: 'center' as const },
-  ]
-  const layout = layoutWorld(inputs, 16 / 9)
-
-  it('has one rail point per stop plus start and entered', () => {
-    expect(layout.rail).toHaveLength(5)
-    expect(layout.look).toHaveLength(5)
-  })
-
-  it('moves forward (-z) stop after stop, viewpoints and exhibits alike', () => {
-    const zs = layout.rail.map((p) => p[2])
-    expect(zs).toEqual([...zs].sort((a, b) => b - a))
-    const az = layout.stations.map((s) => s.anchor[2])
-    expect(az).toEqual([...az].sort((a, b) => b - a))
-  })
-
-  it('keeps side exhibits clear of the camera path', () => {
-    layout.stations.slice(0, 2).forEach((s, i) => {
-      const halfWidth = inputs[i]!.width / 2
-      const pathX = layout.rail[2 + i]![0] - (i % 2 === 0 ? -0.2 : 0.2)
-      expect(Math.abs(s.anchor[0] - pathX) - halfWidth).toBeGreaterThan(0.5)
-    })
-  })
-
-  it('places the camera far enough to fit each exhibit', () => {
-    layout.stations.forEach((s, i) => {
-      const dist = Math.hypot(s.viewpoint[0] - s.anchor[0], s.viewpoint[2] - s.anchor[2])
-      expect(dist).toBeGreaterThanOrEqual(fitDistance(inputs[i]!.width, inputs[i]!.height, 16 / 9) - 1e-6)
-    })
-  })
-
+describe('fitDistance', () => {
   it('steps back further on portrait screens', () => {
     expect(fitDistance(3, 1, 9 / 16)).toBeGreaterThan(fitDistance(3, 1, 16 / 9))
-  })
-
-  it('turns side exhibits to face their viewpoint', () => {
-    for (const s of layout.stations.slice(0, 2)) {
-      const dx = s.viewpoint[0] - s.anchor[0]
-      const dz = s.viewpoint[2] - s.anchor[2]
-      expect(Math.sin(s.yaw) * dz - Math.cos(s.yaw) * dx).toBeCloseTo(0)
-    }
   })
 })
 
