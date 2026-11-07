@@ -28,4 +28,8 @@ export interface Custom3DProps {
   index: number
   /** Scroll timing of the page's route — to know when the camera is at this stop. */
   timing: Timing
+  /** Site navigation (locale-less) — the portal hall gets a door for each page. */
+  nav: { label: string; href: string }[]
+  /** Locale-less href of the current page (no door to where you already are). */
+  currentHref: string
 }

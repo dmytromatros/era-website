@@ -1,0 +1,61 @@
+.cover {
+  position: fixed;
+  inset: 0;
+  z-index: 18; /* above the canvas and the 2D page, below the header */
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  clip-path: circle(0% at var(--ox) var(--oy));
+}
+
+/* the same rings as the doors' portal surface, drifting outwards */
+.cover::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at var(--ox) var(--oy), var(--ui-bg) 0, transparent 35%),
+    repeating-radial-gradient(
+      circle at var(--ox) var(--oy),
+      color-mix(in srgb, var(--ui-accent) 75%, var(--ui-bg)) 0 10px,
+      var(--ui-bg) 10px 26px
+    );
+  animation: drift 1.2s linear infinite;
+}
+
+@keyframes drift {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.12);
+  }
+}
+
+.cover[data-phase='diving'] {
+  opacity: 1;
+  clip-path: circle(150% at var(--ox) var(--oy));
+  transition:
+    clip-path 0.55s cubic-bezier(0.6, 0, 0.9, 0.4),
+    opacity 0.2s;
+}
+
+.cover[data-phase='covered'] {
+  opacity: 1;
+  clip-path: circle(150% at var(--ox) var(--oy));
+}
+
+.cover[data-phase='revealing'] {
+  opacity: 0;
+  clip-path: circle(150% at var(--ox) var(--oy));
+  transform: scale(1.15);
+  transition:
+    opacity 0.7s ease-out,
+    transform 0.7s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover::before {
+    animation: none;
+  }
+}

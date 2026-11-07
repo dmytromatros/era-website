@@ -3,7 +3,8 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { live } from '@/experience/store'
+import { PORTAL_TIMING } from '@/experience/portal'
+import { live, useExperience } from '@/experience/store'
 import { ENTRANCE_GEOMETRY, type WorldLayout } from './layout'
 import type { Timing } from './route'
 import { timeline } from './timeline'
@@ -11,7 +12,10 @@ import { timeline } from './timeline'
 const toVectors = (points: WorldLayout['rail']) => points.map((p) => new THREE.Vector3(...p))
 
 /** Moves the camera along the rail according to scroll. */
-export function CameraRig({ layout, timing }: { layout: WorldLayout; timing: Timing }) {
+/** How far behind the arrival door the camera starts when stepping out of a portal. */
+const STEP_OUT = 1.8
+
+export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; timing: Timing; sceneKey: string }) {
   const camera = useThree((s) => s.camera)
   const { rail, look } = useMemo(
     () => ({
@@ -23,6 +27,7 @@ export function CameraRig({ layout, timing }: { layout: WorldLayout; timing: Tim
   const current = useRef({ index: 0, lookAt: new THREE.Vector3() })
   const tmpPos = useMemo(() => new THREE.Vector3(), [])
   const tmpLook = useMemo(() => new THREE.Vector3(), [])
+  const tmpTarget = useMemo(() => new THREE.Vector3(), [])
 
   // New page: snap to the start (the hero must line up with the DOM).
   useLayoutEffect(() => {
@@ -48,6 +53,26 @@ export function CameraRig({ layout, timing }: { layout: WorldLayout; timing: Tim
     const parallax = THREE.MathUtils.smoothstep(t.entrance, 0.3, 1) * 0.25
     tmpPos.x += live.pointer.x * parallax
     tmpPos.y += live.pointer.y * parallax * 0.5
+
+    const { portal, arrivedVia } = useExperience.getState()
+    const age = performance.now() - portal.since
+
+    // Diving into a door: pull the camera towards it and look straight in.
+    if (portal.phase === 'diving' && portal.target) {
+      const k = Math.min(age / PORTAL_TIMING.dive, 1)
+      const ease = k * k * k
+      tmpTarget.set(...portal.target)
+      tmpPos.lerp(tmpTarget, ease * 0.85)
+      tmpLook.lerp(tmpTarget, Math.min(k * 2, 1))
+    }
+
+    // Arrived through a portal: start behind the arrival door and step out through it, along
+    // the way the camera looks (the door stands behind the first stop, see ArrivalDoor).
+    if (arrivedVia === sceneKey && (portal.phase === 'covered' || portal.phase === 'revealing')) {
+      const k = portal.phase === 'covered' ? 0 : Math.min(age / PORTAL_TIMING.reveal, 1)
+      tmpTarget.subVectors(tmpLook, tmpPos).setY(0).normalize()
+      tmpPos.addScaledVector(tmpTarget, -STEP_OUT * (1 - k) * (1 - k))
+    }
 
     camera.position.copy(tmpPos)
     c.lookAt.copy(tmpLook)

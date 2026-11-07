@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { ElementSpec } from '@/experience/measure'
 import { live, useExperience } from '@/experience/store'
-import { ElementView, textCount } from './ElementView'
+import { ElementView, textKeys } from './ElementView'
 import { toWorld, type Vec3 } from './exhibitModel'
 import { ENTRANCE_GEOMETRY } from './layout'
 import { ENTRANCE } from './timeline'
@@ -45,7 +45,7 @@ export function HeroTransit({
   sceneKey: string
 }) {
   const group = useRef<THREE.Group>(null)
-  const synced = useRef(0)
+  const synced = useRef(new Set<string>())
 
   const poses = useMemo(
     () =>
@@ -66,13 +66,17 @@ export function HeroTransit({
   )
 
   // Ready = every text has its glyphs built (otherwise the swap would flash empty).
-  const expected = items.reduce((n, i) => n + textCount(i.spec), 0)
-  useEffect(() => {
-    synced.current = 0
-  }, [items])
-  const onSync = () => {
-    synced.current++
-    if (synced.current >= expected) useExperience.getState().markCanvasReady(sceneKey)
+  const expected = useMemo(() => items.flatMap((i) => textKeys(i.spec)), [items])
+  const check = () => {
+    if (expected.length && expected.every((key) => synced.current.has(key))) {
+      useExperience.getState().markCanvasReady(sceneKey)
+    }
+  }
+  // after a re-measure the same texts may already be ready
+  useEffect(check)
+  const onSync = (key: string) => {
+    synced.current.add(key)
+    check()
   }
 
   useFrame(() => {

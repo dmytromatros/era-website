@@ -136,6 +136,15 @@ export const pageSchema = z
   .object({
     title: z.string().min(1),
     description: z.string().optional(),
+    /** Optional look of this page's office (defaults derive from the page, see world/officeStyle.ts). */
+    office: z
+      .object({
+        /** Different number = different furniture arrangement. */
+        seed: z.number().int().optional(),
+        /** Light accent for this office (chairs, dividers). */
+        accent: hexColor.optional(),
+      })
+      .optional(),
     blocks: z.array(blockSchema).min(1),
   })
   .refine((page) => page.blocks[0]?.type === 'hero', {

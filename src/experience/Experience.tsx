@@ -2,6 +2,8 @@
 
 import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
+import { sceneKeyOf } from './portal'
+import { PortalOverlay } from './PortalOverlay'
 import { live, selectReady, useExperience } from './store'
 
 // three.js only downloads when the 3D layer is actually used.
@@ -55,5 +57,25 @@ export function Experience() {
     return () => window.removeEventListener('pointermove', onMove)
   }, [])
 
-  return mode === '3d' ? <Scene /> : null
+  // Back / Forward: if the visitor was inside 3D on that page, return there (covered, no 2D flash).
+  useEffect(() => {
+    const onPop = () => {
+      const s = useExperience.getState()
+      if (s.mode !== '3d') return
+      const y = live.positions[sceneKeyOf(window.location.pathname)]
+      if (y === undefined || y < 4) return
+      document.documentElement.setAttribute('data-arrival', '')
+      s.setArrival({ kind: 'back', scrollY: y })
+      s.setPortal('covered', { target: null, origin: { x: 0.5, y: 0.5 } })
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  return (
+    <>
+      {mode === '3d' && <Scene />}
+      <PortalOverlay />
+    </>
+  )
 }

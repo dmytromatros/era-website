@@ -33,6 +33,7 @@ export default async function Page({ params }: PageProps<'/[locale]/[[...slug]]'
         locale,
         page,
         actors: readActorsFor(page),
+        nav: readSite().nav[locale] ?? [],
       }}
     />
   )

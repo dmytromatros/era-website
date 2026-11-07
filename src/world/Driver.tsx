@@ -23,6 +23,10 @@ export function Driver() {
 
     if (!state.handedOver) {
       live.progress = 0
+    } else if (state.instantProgress) {
+      // arrived through a portal / Back: start right where the scroll is, no glide
+      live.progress = live.scroll
+      state.setInstantProgress(false)
     } else {
       live.progress += (live.scroll - live.progress) * (1 - Math.exp(-delta * CATCH_UP))
       if (Math.abs(live.scroll - live.progress) < 1e-4) live.progress = live.scroll

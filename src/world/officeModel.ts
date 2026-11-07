@@ -194,14 +194,14 @@ function partition(w: Box, solid: Prim[], glass: Box[], frosted: Box[]) {
   glass.push({ center: at(0, 1.6 + (H - 1.68) / 2), size: sized(0.03, H - 1.68, length), yaw })
 }
 
-export function buildOffice(layout: WorldLayout): Office {
+export function buildOffice(layout: WorldLayout, seed = 11): Office {
   const { walls, stairs, mezzanines, clear } = layout.architecture
   const solid: Prim[] = []
   const glass: Box[] = []
   const frosted: Box[] = []
   const lights: Box[] = []
   const windows: Box[] = []
-  const rand = seeded(11)
+  const rand = seeded(seed)
 
   // ---- bounds: everything the route touches, plus a margin of office floor ----
   const pts: Vec3[] = [...layout.rail, ...layout.stations.map((s) => s.anchor)]

@@ -15,9 +15,14 @@ const BALL = new THREE.IcosahedronGeometry(0.5, 1)
 const tmp = new THREE.Object3D()
 const color = new THREE.Color()
 
-function matColor(theme: Theme, mat: Mat): string {
+function matColor(theme: Theme, mat: Mat, accent?: string): string {
   const o = theme.world.office
-  return mat === 'wall' ? theme.world.wall : o[mat]
+  if (mat === 'wall') return theme.world.wall
+  // the page's accent tints the soft furnishings, so each office has its own character
+  if (accent && (mat === 'fabricA' || mat === 'fabricB')) {
+    return '#' + color.set(o[mat]).lerp(new THREE.Color(accent), mat === 'fabricA' ? 0.7 : 0.35).getHexString()
+  }
+  return o[mat]
 }
 
 /** One instanced mesh for a list of primitives / boxes (same geometry, one draw call). */
@@ -63,7 +68,7 @@ function Instanced({
  * cylinders and balls (per-instance colours from the theme), glass, frosted glass, ceiling
  * lights, windows, and the ceiling plane.
  */
-export function Office({ data }: { data: OfficeData }) {
+export function Office({ data, accent }: { data: OfficeData; accent?: string }) {
   const theme = useTheme()
   const o = theme.world.office
 
@@ -98,9 +103,9 @@ export function Office({ data }: { data: OfficeData }) {
   }, [materials, o])
   useLayoutEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials])
 
-  const colorBox = useMemo(() => (i: number) => matColor(theme, groups.box[i]!.mat), [theme, groups])
-  const colorCyl = useMemo(() => (i: number) => matColor(theme, groups.cyl[i]!.mat), [theme, groups])
-  const colorBall = useMemo(() => (i: number) => matColor(theme, groups.ball[i]!.mat), [theme, groups])
+  const colorBox = useMemo(() => (i: number) => matColor(theme, groups.box[i]!.mat, accent), [theme, groups, accent])
+  const colorCyl = useMemo(() => (i: number) => matColor(theme, groups.cyl[i]!.mat, accent), [theme, groups, accent])
+  const colorBall = useMemo(() => (i: number) => matColor(theme, groups.ball[i]!.mat, accent), [theme, groups, accent])
 
   return (
     <group>

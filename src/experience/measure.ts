@@ -63,8 +63,17 @@ function textStyle(cs: CSSStyleDeclaration): TextStyle {
 
 const rectOf = (r: DOMRect): Rect => ({ x: r.left, y: r.top, width: r.width, height: r.height })
 
-/** `innerText` keeps line breaks between block children and applies `text-transform`. */
-const textOf = (el: HTMLElement) => el.innerText.trim()
+/**
+ * `innerText` keeps line breaks between block children and applies `text-transform` — but it is
+ * empty for an element that is not rendered visibly. Fall back to the raw text then, so a hidden
+ * element never produces a blank 3D copy.
+ */
+function textOf(el: HTMLElement): string {
+  const rendered = el.innerText.trim()
+  if (rendered) return rendered
+  const raw = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+  return getComputedStyle(el).textTransform === 'uppercase' ? raw.toUpperCase() : raw
+}
 
 /**
  * Where a text element's lines really are.

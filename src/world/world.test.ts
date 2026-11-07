@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BODY } from '@/actors/rig'
 import type { ElementSpec } from '@/experience/measure'
+import { textKeys } from './ElementView'
 import { buildExhibit } from './exhibitModel'
 import { fitDistance } from './layout'
 import { pageStops } from './stops'
@@ -64,5 +65,25 @@ describe('buildExhibit', () => {
     expect(h!.local[1]).toBeGreaterThan(l!.local[1]) // heading above lead
     // centres are 50px and 130px from the top in 2D → 80px apart
     expect(h!.local[1] - l!.local[1]).toBeCloseTo(80 * k)
+  })
+})
+
+describe('textKeys (readiness of 3D texts)', () => {
+  const base = {
+    x: 0,
+    y: 0,
+    width: 10,
+    height: 10,
+    style: { fontSize: 16, fontWeight: 400, letterSpacing: 0, lineHeight: 1.2, color: '#000', align: 'left' as const },
+  }
+  it('gives one key per text, stable across re-measures, new when the text changes', () => {
+    const card: ElementSpec = { ...base, id: 'card-0', kind: 'card', text: '', parts: [
+      { ...base, text: 'Title' },
+      { ...base, text: 'Body' },
+    ] }
+    expect(textKeys(card)).toEqual(['card-0#0:Title', 'card-0#1:Body'])
+    expect(textKeys({ ...card })).toEqual(textKeys(card))
+    const heading: ElementSpec = { ...base, id: 'heading', kind: 'text', text: 'Hi', parts: [] }
+    expect(textKeys(heading)).not.toEqual(textKeys({ ...heading, text: 'Hello' }))
   })
 })

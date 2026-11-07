@@ -14,9 +14,16 @@
   inset: 0;
 }
 
-/* Instant swap: the 3D twins sit exactly where these elements are. */
-:global(html[data-handover]) .hero {
-  visibility: hidden;
+/*
+ * Instant swap: the 3D twins sit exactly where these elements are.
+ * Hidden with opacity, NOT visibility: a visibility:hidden element reports empty innerText,
+ * and the hero is re-measured while hidden (portal arrival, theme switch, resize in 3D) —
+ * its 3D copies would come out blank.
+ */
+:global(html[data-handover]) .hero,
+:global(html[data-arrival]) .hero {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .inner {

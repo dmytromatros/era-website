@@ -17,8 +17,8 @@ interface Props {
   spec: ElementSpec
   /** World units per CSS pixel. */
   k: number
-  /** Called when a text's glyphs are ready (once per text inside the element). */
-  onSync?: () => void
+  /** Called with a text's key (see `textKeys`) whenever its glyphs are ready. */
+  onSync?: (key: string) => void
 }
 
 function Label({
@@ -138,7 +138,7 @@ export function ElementView({ spec, k, onSync }: Props) {
           style={spec.style}
           k={k}
           maxWidth={w + slack}
-          onSync={onSync}
+          onSync={onSync && (() => onSync(textKeys(spec)[0]!))}
           position={[-w / 2, h / 2, 0]}
           anchor="top-left"
         />
@@ -163,7 +163,14 @@ export function ElementView({ spec, k, onSync }: Props) {
       </Slab>
       <group position-z={DEPTH / 2 + 0.002}>
         {spec.kind === 'button' ? (
-          <Label text={spec.text} style={spec.style} k={k} onSync={onSync} position={[0, 0, 0]} anchor="center" />
+          <Label
+            text={spec.text}
+            style={spec.style}
+            k={k}
+            onSync={onSync && (() => onSync(textKeys(spec)[0]!))}
+            position={[0, 0, 0]}
+            anchor="center"
+          />
         ) : (
           spec.parts.map((part, i) => (
             <Label
@@ -172,7 +179,7 @@ export function ElementView({ spec, k, onSync }: Props) {
               style={part.style}
               k={k}
               maxWidth={part.width * k + slack}
-              onSync={onSync}
+              onSync={onSync && (() => onSync(textKeys(spec)[i]!))}
               position={[-w / 2 + part.x * k, h / 2 - part.y * k, 0]}
               anchor="top-left"
             />
@@ -183,7 +190,12 @@ export function ElementView({ spec, k, onSync }: Props) {
   )
 }
 
-/** How many texts an element contains — to know when all of them are ready. */
-export function textCount(spec: ElementSpec): number {
-  return spec.kind === 'card' ? spec.parts.length : 1
+/**
+ * One key per text inside an element (its id, which text, and the text itself). Readiness is
+ * tracked per key, not by counting: re-measuring builds new objects but unchanged texts do not
+ * re-sync, so a counter reset on re-measure would never reach "all ready" again.
+ */
+export function textKeys(spec: ElementSpec): string[] {
+  if (spec.kind === 'card') return spec.parts.map((p, i) => `${spec.id}#${i}:${p.text}`)
+  return [`${spec.id}#0:${spec.text}`]
 }

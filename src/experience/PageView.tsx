@@ -7,9 +7,10 @@ import type { Block2DProps } from '@/blocks/types'
 import type { Block } from '@/content/schema'
 import { useThemeStore } from '@/theme/store'
 import { planTiming, routePlan } from '@/world/route'
-import { scrollToUnits, totalUnits } from '@/world/timeline'
+import { ENTRANCE, scrollToUnits, totalUnits } from '@/world/timeline'
 import { measurePage } from './measure'
-import { live, useExperience, type SceneData } from './store'
+import { PORTAL_TIMING, reveal } from './portal'
+import { live, selectReady, useExperience, type SceneData } from './store'
 import styles from './PageView.module.css'
 
 function Block2D(props: Block2DProps<Block>) {
@@ -36,7 +37,7 @@ export function PageView({ scene }: { scene: SceneData }) {
   }, [scene])
 
   useEffect(() => {
-    useExperience.getState().setNavigate((href) => router.push(href))
+    useExperience.getState().setNavigate((href, opts) => router.push(href, { scroll: opts?.scroll ?? true }))
   }, [router])
 
   // Measure every element of the page (re-measure on resize, font load and theme change).
@@ -68,6 +69,7 @@ export function PageView({ scene }: { scene: SceneData }) {
       const max = document.documentElement.scrollHeight - window.innerHeight
       live.scroll = scrollToUnits(window.scrollY, max, segments)
       live.scrollPx = window.scrollY
+      live.positions[scene.key] = window.scrollY
       // The 2D → 3D handover itself is decided inside the canvas frame (world/Driver.tsx).
     }
     update()
@@ -78,6 +80,57 @@ export function PageView({ scene }: { scene: SceneData }) {
       window.removeEventListener('resize', update)
     }
   }, [mode, segments, scene.key])
+
+  // Arriving through a portal (or Back): start inside 3D, not on the 2D hero. The hero stays
+  // hidden (data-arrival) while the office builds under the portal cover; then scroll into place,
+  // hand over at once, and reveal.
+  useEffect(() => {
+    if (mode !== '3d') return
+    const arrival = useExperience.getState().arrival
+    const html = document.documentElement
+    if (!arrival) {
+      html.removeAttribute('data-arrival')
+      useExperience.getState().setArrivedVia(null)
+      return
+    }
+    html.setAttribute('data-arrival', '')
+    useExperience.getState().setArrivedVia(arrival.kind === 'portal' ? scene.key : null)
+    let placed = false
+    let done = false
+
+    const finish = () => {
+      if (done) return
+      done = true
+      unsubscribe()
+      window.clearTimeout(timer)
+      html.removeAttribute('data-arrival')
+      useExperience.getState().setArrival(null)
+      reveal()
+    }
+    const place = () => {
+      const s = useExperience.getState()
+      if (placed || !selectReady(s)) return
+      placed = true
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      // Portal: step out right in front of the page's first exhibit (its headline).
+      const firstStop = ENTRANCE + (segments[0]?.units ?? 0)
+      const y = Math.min(arrival.scrollY ?? Math.ceil((max * firstStop) / totalUnits(segments)), max)
+      window.scrollTo(0, y)
+      live.scroll = scrollToUnits(y, max, segments)
+      live.scrollPx = y
+      s.setInstantProgress(true)
+    }
+    const unsubscribe = useExperience.subscribe((s) => {
+      place()
+      if (placed && s.handedOver) finish()
+    })
+    const timer = window.setTimeout(finish, PORTAL_TIMING.timeout)
+    place()
+    return () => {
+      unsubscribe()
+      window.clearTimeout(timer)
+    }
+  }, [mode, scene.key, segments])
 
   const props = { locale: scene.locale, actors: scene.actors }
   return (
