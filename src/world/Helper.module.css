@@ -1,0 +1,74 @@
+/* The Html point sits beside the character's head; the bubble opens away from the element. */
+.anchorAbove {
+  transform: translate(-50%, -100%);
+}
+
+.anchorRight {
+  transform: translate(0, -50%);
+}
+
+.dock {
+  position: absolute;
+  left: 16px;
+  top: calc(100svh - 24px);
+  width: calc(100vw - 32px);
+  display: flex;
+  justify-content: center;
+  transform: translateY(-100%);
+}
+
+.dock .bubble {
+  width: 100%;
+  max-width: 520px;
+  transform-origin: 50% 100%;
+}
+
+.bubble {
+  width: min(280px, 60vw);
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--ui-bubble);
+  color: var(--ui-bubble-text);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.12);
+  font-family: var(--font-sans);
+  animation: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.anchorAbove .bubble {
+  transform-origin: 50% 100%;
+}
+
+.anchorRight .bubble {
+  transform-origin: 0 50%;
+}
+
+.name {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ui-accent);
+}
+
+.line {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.line + .line {
+  margin-top: 6px;
+}
+
+.ghost {
+  visibility: hidden;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}

@@ -1,0 +1,8 @@
+name: DFRNC
+defaultLocale: en
+locales: [en]
+nav:
+  en:
+    - { label: Home, href: / }
+    - { label: Who we are, href: /who-we-are }
+    - { label: Contacts, href: /contacts }

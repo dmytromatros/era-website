@@ -1,0 +1,27 @@
+.door {
+  display: grid;
+  gap: 8px;
+  padding: 40px 32px;
+  border-radius: 24px;
+  background: var(--ui-text);
+  color: var(--ui-bg);
+  text-decoration: none;
+  transition: transform 0.2s;
+}
+
+.door:hover {
+  transform: translateY(-3px);
+}
+
+.kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.label {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 800;
+}

@@ -1,0 +1,97 @@
+/* Shared look of the content modules. Only font weights 400 / 500 / 700 / 800 (3D has those files). */
+
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 96px var(--gutter);
+}
+
+.heading {
+  margin: 0 0 40px;
+  font-size: clamp(34px, 5vw, 64px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border-radius: 22px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.cardText {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+
+.cardTag {
+  margin: auto 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ui-accent);
+}
+
+.cta {
+  display: grid;
+  justify-items: start;
+  gap: 18px;
+  /* No panel background on purpose: in 3D every element floats on its own, and a panel
+     colour would not travel with the text (light text would vanish in a light world). */
+  padding: 56px 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ctaHeading {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 64px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.ctaText {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+
+.ctaButton {
+  display: inline-flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 30px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  color: var(--ui-accent-text);
+  font-size: 17px;
+  font-weight: 700;
+  text-decoration: none;
+}

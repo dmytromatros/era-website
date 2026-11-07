@@ -1,0 +1,21 @@
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 600 13px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--ui-text) 50%, var(--ui-bg) 50%);
+  border: 1px solid var(--ui-text);
+}

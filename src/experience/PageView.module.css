@@ -1,0 +1,29 @@
+.main {
+  position: relative;
+}
+
+.blocks {
+  display: grid;
+  padding-bottom: 120px;
+}
+
+.track {
+  display: none;
+}
+
+/*
+ * 3D mode: the modules stay laid out at full viewport width (the canvas measures them), but
+ * invisible and inert. Opacity — not visibility/display — so screen readers still read them.
+ */
+:global(html[data-experience='3d']) .blocks {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+:global(html[data-experience='3d']) .track {
+  display: block;
+}

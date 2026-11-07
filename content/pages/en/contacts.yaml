@@ -1,0 +1,25 @@
+title: Contacts — DFRNC
+description: Tell us about your project.
+blocks:
+  - type: hero
+    eyebrow: Contacts
+    heading: ["Let's do", "incredible things", "together"]
+    lead: Tell us about your project — we'll get back to you.
+    actions:
+      - { label: dfrnc@gmail.com, href: "mailto:dfrnc@gmail.com", variant: primary }
+    tags: [LINKEDIN, BEHANCE, INSTAGRAM]
+
+  - type: cta
+    heading: Let us write to you
+    text: Haven't submitted your application yet? Drop us a line.
+    action: { label: Write to us, href: "mailto:dfrnc@gmail.com" }
+    helpers:
+      - target: action
+        actor: leo
+        pose: waving
+        lines:
+          - We answer fast. Usually faster than this bubble types.
+
+  - type: door
+    label: Back to the start
+    href: /

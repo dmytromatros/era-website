@@ -1,0 +1,33 @@
+title: Who we are — DFRNC
+description: A team of illustrators, designers, animators and developers.
+blocks:
+  - type: hero
+    eyebrow: Who we are
+    heading: ["We go beyond", "“possible”"]
+    lead: Illustrators, designers, animators and developers who bring ideas to life with meticulous attention to detail.
+    actions:
+      - { label: Get in touch, href: /contacts, variant: primary }
+    helpers:
+      - target: heading
+        actor: nova
+        pose: holding
+        lines:
+          - Holding up “possible” is my day job.
+
+  - type: cards
+    heading: Benefits
+    items:
+      - { title: 7+ years, text: In the industry., tag: Experience }
+      - { title: Personalized support, text: A manager supports you throughout your project journey. }
+      - { title: Attention to details, text: Every tiny thing matters — that's why we are different. }
+      - { title: 1281 projects, text: Done. And counting., tag: Portfolio }
+    helpers:
+      - target: card-3
+        actor: max
+        pose: rotating-cube
+        lines:
+          - Each cube is a project. I've lost count somewhere around a thousand.
+
+  - type: door
+    label: Let's talk
+    href: /contacts

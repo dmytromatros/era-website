@@ -1,0 +1,83 @@
+title: DFRNC — Web motion design
+description: Interactive websites, 3D/AR commerce, web apps and creative services.
+blocks:
+  - type: hero
+    eyebrow: Web motion design studio
+    heading: ["We make it", "different"]
+    lead: Make your business stand out online with us.
+    actions:
+      - { label: Start the project, href: /contacts, variant: primary }
+      - { label: Who we are, href: /who-we-are, variant: secondary }
+    tags: [WEBSITES, INTERACTIVES, 2D|3D, EXPLAINERS, WEBAPPS, UX|UI]
+    helpers:
+      - target: heading
+        actor: max
+        pose: holding
+        lines:
+          - Careful, this headline is heavy — it carries the whole brand.
+          - Every project we take has to be different. That's the rule.
+      - target: action-0
+        actor: kit
+        pose: typing
+        lines:
+          - I'm wiring up this button. One click and you're talking to a real manager.
+
+  - type: cards
+    heading: Different creative services
+    items:
+      - title: Creative services
+        text: Bring your brand to life — AI-powered creative services.
+        tag: Illustration · Motion
+      - title: 3D/AR commerce
+        text: Visualize, customize, sell — 3D & AR commerce for any platform.
+        tag: Configurators · WebAR
+      - title: Web applications
+        text: AI-powered web applications for business growth and efficiency.
+        tag: SaaS · Dashboards
+      - title: Interactive WOW websites
+        text: Engage, inspire, convert — AI-powered interactive websites.
+        tag: Like this one
+    helpers:
+      - target: card-1
+        actor: nova
+        pose: pointing
+        lines:
+          - Customers spin the product right in the browser. No app needed.
+      - target: card-3
+        actor: zip
+        pose: juggling
+        lines:
+          - You're inside one right now. Pretty different, right?
+
+  - type: steps
+    heading: Want to know how to start?
+    items:
+      - title: 01 · You apply
+        text: Apply on this site, and our manager will connect with you to chat about your project idea.
+      - title: 02 · Budget & timelines
+        text: After we lock in the details together, expect your project proposal and invoice.
+      - title: 03 · Relax
+        text: As we craft your dream product, chill out. Your manager keeps you in the loop.
+      - title: 04 · Delivery
+        text: After our touch-up, your product is all set to work for you and bring in profit!
+    helpers:
+      - target: step-1
+        actor: ada
+        pose: presenting
+        lines:
+          - Budget, scope, dates — all on one page before we start. No surprises.
+
+  - type: cta
+    heading: Haven't applied yet?
+    text: 9 people started projects as you read!
+    action: { label: Apply now, href: /contacts }
+    helpers:
+      - target: action
+        actor: leo
+        pose: waving
+        lines:
+          - Hey! This is the button. You know what to do.
+
+  - type: door
+    label: Who we are
+    href: /who-we-are

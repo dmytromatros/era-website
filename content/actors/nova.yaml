@@ -1,0 +1,6 @@
+# Placeholder character — name and look are invented for the prototype.
+name: Nova
+role: Art director
+palette: { skin: "#f1c7a3", shirt: "#ff6b5b", pants: "#2b2d42", accent: "#ffd166", hair: "#3a2618" }
+accessories: [beret]
+

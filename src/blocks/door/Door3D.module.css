@@ -1,0 +1,25 @@
+.enter {
+  pointer-events: auto;
+  height: 46px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  color: var(--ui-accent-text);
+  font: 800 16px/1 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+  animation: in 0.3s ease-out;
+}
+
+.enter:hover {
+  filter: brightness(1.08);
+}
+
+@keyframes in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
