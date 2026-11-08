@@ -4,7 +4,7 @@ import { useThree } from '@react-three/fiber'
 import { useEffect, useState } from 'react'
 import * as THREE from 'three'
 import { useExperience } from '@/experience/store'
-import { QUALITY, useQuality } from './quality'
+import { warmPrograms } from './precompile'
 import { STYLE, SWITCHABLE } from './style'
 import { applyToon, type ToonVariant } from './toonMaterial'
 
@@ -71,44 +71,7 @@ export function StylePrecompile() {
           proxies.add(proxy)
         }
       })
-      // Same kind of target the composer renders the world into (half-float, MSAA of the
-      // current quality level): some drivers specialise a program per target format.
-      const target = new THREE.WebGLRenderTarget(1, 1, {
-        type: THREE.HalfFloatType,
-        samples: QUALITY[useQuality.getState().level].multisampling,
-      })
-      const intoTarget = (fn: () => void) => {
-        const previous = gl.getRenderTarget()
-        gl.setRenderTarget(target)
-        fn()
-        gl.setRenderTarget(previous)
-      }
-      let done!: Promise<unknown>
-      intoTarget(() => (done = gl.compileAsync(proxies, camera, scene)))
-      // Drivers may finish a program only at its first draw. So once compiled, draw the
-      // proxies once — inside the real scene (same lights / fog → same programs), into the
-      // 1×1 target, at an idle moment — then take them out again.
-      void done
-        .then(
-          () =>
-            new Promise<void>((resolve) => {
-              const warm = () => {
-                if (!cancelled) {
-                  const list = [...proxies.children]
-                  list.forEach((p) => {
-                    p.frustumCulled = false
-                    scene.add(p)
-                  })
-                  intoTarget(() => gl.render(scene, camera))
-                  list.forEach((p) => proxies.add(p))
-                }
-                resolve()
-              }
-              if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 2000 })
-              else warm()
-            }),
-        )
-        .finally(() => target.dispose())
+      void warmPrograms(gl, scene, camera, proxies, () => cancelled)
     }
 
     const timer = setTimeout(() => {

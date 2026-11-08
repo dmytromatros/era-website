@@ -58,7 +58,8 @@ export function Slab({
     geometry.current?.translate(0, 0, -depth / 2)
   }, [args, depth])
   return (
-    <mesh>
+    // xraySolid: in X-ray a UI plate stays a solid (dark) panel, so its text reads (XRay.tsx).
+    <mesh userData={{ xraySolid: true }}>
       <extrudeGeometry ref={geometry} args={args} />
       {children}
     </mesh>

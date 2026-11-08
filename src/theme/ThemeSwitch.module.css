@@ -19,3 +19,33 @@
   background: linear-gradient(90deg, var(--ui-text) 50%, var(--ui-bg) 50%);
   border: 1px solid var(--ui-text);
 }
+
+/*
+ * Phones (≤ 420 px): the header row holds the logo and four switches only if the theme and
+ * X-ray switches shrink to icons (else the tools wrap and the header grows a third row).
+ * `.label` hides, `.icon` (shown only here) replaces it, `.compact` makes the button square.
+ */
+.icon {
+  display: none;
+}
+
+@media (max-width: 420px) {
+  .compact {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+  .label {
+    display: none;
+  }
+  .icon {
+    display: inline-block;
+  }
+}
+
+/* A toggle that is on (X-ray): inverted, like the active menu item. */
+.switch[aria-pressed='true'] {
+  background: var(--ui-text);
+  color: var(--ui-bg);
+  border-color: var(--ui-text);
+}

@@ -16,13 +16,13 @@ export function ThemeSwitch() {
   return (
     <button
       type="button"
-      className={styles.switch}
+      className={`${styles.switch} ${styles.compact}`}
       onClick={() => setTheme(next)}
       aria-label={`Switch to ${themes[next].label} theme`}
       title={`Theme: ${themes[name].label}`}
     >
       <span className={styles.dot} aria-hidden />
-      {themes[name].label}
+      <span className={styles.label}>{themes[name].label}</span>
     </button>
   )
 }

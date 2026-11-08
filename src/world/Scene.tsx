@@ -11,6 +11,8 @@ import { Floor } from './Floor'
 import { Metrics } from './Metrics'
 import { QualityGovernor } from './QualityGovernor'
 import { StylePrecompile } from './StylePrecompile'
+import { XRay } from './XRay'
+import { XRayPanel } from './XRayPanel'
 import { setHtmlPortal } from './htmlPortal'
 import { SceneContent } from './SceneContent'
 import styles from './Scene.module.css'
@@ -45,9 +47,12 @@ export function Scene() {
         <Metrics />
         {/* Both looks compiled ahead, so the Comic ↔ Pastel switch does not hitch. */}
         <StylePrecompile />
+        {/* X-ray mode: the world as a blueprint, one colour per draw call (B4). */}
+        <XRay />
       </Canvas>
       <div className={styles.overlay} ref={setHtmlPortal} />
       <DebugStats />
+      <XRayPanel />
     </div>
   )
 }

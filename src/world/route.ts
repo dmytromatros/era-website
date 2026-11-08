@@ -81,15 +81,19 @@ export interface Timing {
   segments: Segment[]
   /** Rail index at which the camera stands at each stop. */
   stopRail: number[]
+  /** Rail indices of the key stops — where the camera really stops (the accents). */
+  keyRail: number[]
 }
 
 export function planTiming(plan: RoutePlan): Timing {
   const stopRail: number[] = []
+  const keyRail: number[] = []
   const segments = plan.items.map((item, i): Segment => {
     if (item.kind === 'waypoint') return { units: WAYPOINT_UNITS, dwell: 0.5 }
     stopRail[item.stopIndex] = 2 + i // rail: [start, entered, ...items]
+    if (item.key) keyRail.push(2 + i)
     // Arriving at a key stop: slow down a lot. Passing a minor one: barely.
     return item.key ? { units: KEY_UNITS, dwell: 0.85 } : { units: PASS_UNITS, dwell: 0.35 }
   })
-  return { segments, stopRail }
+  return { segments, stopRail, keyRail }
 }

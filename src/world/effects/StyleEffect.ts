@@ -1,6 +1,7 @@
 import { BlendFunction, Effect, EffectAttribute } from 'postprocessing'
 import { Uniform, Vector3 } from 'three'
 import type { PostSettings } from '../style'
+import { BLUR } from './DepthBlurEffect'
 
 /**
  * The style's screen pass (wow-plan A3 / A4), ONE pass for everything:
@@ -26,6 +27,8 @@ const fragmentShader = /* glsl */ `
   uniform float uCrease;         // strength of crease lines (0 = none)
   uniform vec3 uShadowTint;
   uniform vec3 uHighlightTint;
+  uniform float uBlurMix;        // background blur (DepthBlurEffect): its lines soften too
+  uniform float uBlurFocus;
 
   float viewDepth(const in vec2 uv) {
     return -getViewZ(readDepth(uv));
@@ -62,6 +65,8 @@ const fragmentShader = /* glsl */ `
       float crease = smoothstep(0.004, 0.012, bend) * uCrease;
       edge = max(edge, crease);
       edge *= 1.0 - smoothstep(12.0, 40.0, z); // far lines would be noise
+      // Sharp ink on a blurred background looks pasted on: soften the lines where it blurs.
+      edge *= 1.0 - 0.85 * uBlurMix * clamp((z - uBlurFocus * (1.0 + ${BLUR.start.toFixed(3)})) / (uBlurFocus * ${BLUR.range.toFixed(3)}), 0.0, 1.0);
       g = mix(g, uOutlineColor, edge * uOutlineStrength);
     }
 
@@ -86,6 +91,8 @@ export class StyleEffect extends Effect {
         ['uCrease', new Uniform(0)],
         ['uShadowTint', new Uniform(new Vector3(1, 1, 1))],
         ['uHighlightTint', new Uniform(new Vector3(1, 1, 1))],
+        ['uBlurMix', new Uniform(0)],
+        ['uBlurFocus', new Uniform(6)],
       ]),
     })
   }
@@ -96,6 +103,12 @@ export class StyleEffect extends Effect {
 
   get mix(): number {
     return this.uniforms.get('uMix')!.value as number
+  }
+
+  /** Tell the outlines how the background blur stands (0 = no blur), so they soften with it. */
+  setBlur(mix: number, focus: number) {
+    this.uniforms.get('uBlurMix')!.value = mix
+    this.uniforms.get('uBlurFocus')!.value = focus
   }
 
   /** Apply a style's post settings; `outlines` false (low quality) drops the outlines. */

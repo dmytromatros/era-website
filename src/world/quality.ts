@@ -26,13 +26,15 @@ export interface QualitySettings {
    * springs on the CPU and one uniform upload per frame, no extra draw calls.
    */
   kineticText: boolean
+  /** Background blur (B3): samples per pixel, 0 = off (no pass at all). */
+  depthBlur: number
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true },
-  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, depthBlur: 0 },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, depthBlur: 8 },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, depthBlur: 16 },
 }
 
 const STORAGE_KEY = 'era-quality'

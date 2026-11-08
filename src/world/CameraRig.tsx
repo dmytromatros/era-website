@@ -5,6 +5,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { PORTAL_TIMING } from '@/experience/portal'
 import { live, useExperience } from '@/experience/store'
+import { accentAt, cameraFocus, dollyFov, dollyPosition } from './cinema'
 import { ENTRANCE_GEOMETRY, type WorldLayout } from './layout'
 import type { Timing } from './route'
 import { timeline } from './timeline'
@@ -16,7 +17,7 @@ const toVectors = (points: WorldLayout['rail']) => points.map((p) => new THREE.V
 const STEP_OUT = 1.8
 
 export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; timing: Timing; sceneKey: string }) {
-  const camera = useThree((s) => s.camera)
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
   const { rail, look } = useMemo(
     () => ({
       rail: new THREE.CatmullRomCurve3(toVectors(layout.rail), false, 'centripetal'),
@@ -32,6 +33,8 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
   // New page: snap to the start (the hero must line up with the DOM).
   useLayoutEffect(() => {
     current.current.index = 0
+    camera.fov = ENTRANCE_GEOMETRY.fov
+    camera.updateProjectionMatrix()
     camera.position.set(...ENTRANCE_GEOMETRY.cameraStart)
     look.getPoint(0, current.current.lookAt)
     camera.lookAt(current.current.lookAt)
@@ -53,6 +56,16 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     const parallax = THREE.MathUtils.smoothstep(t.entrance, 0.3, 1) * 0.25
     tmpPos.x += live.pointer.x * parallax
     tmpPos.y += live.pointer.y * parallax * 0.5
+
+    // Dolly zoom on the way in (B3, cinema.ts): wider view, camera closer to the first stop by
+    // as much as keeps it the same size. Exactly the normal fov at the top and after entering.
+    const target = layout.stations[0]?.focus
+    const fov = target ? dollyFov(t.entrance) : ENTRANCE_GEOMETRY.fov
+    if (target && fov !== ENTRANCE_GEOMETRY.fov) tmpPos.set(...dollyPosition([tmpPos.x, tmpPos.y, tmpPos.z], target, fov))
+    if (camera.fov !== fov) {
+      camera.fov = fov
+      camera.updateProjectionMatrix()
+    }
 
     const { portal, arrivedVia } = useExperience.getState()
     const age = performance.now() - portal.since
@@ -77,6 +90,8 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     camera.position.copy(tmpPos)
     c.lookAt.copy(tmpLook)
     camera.lookAt(c.lookAt)
+    cameraFocus.distance = tmpPos.distanceTo(tmpLook)
+    cameraFocus.accent = accentAt(t.railIndex, timing.keyRail)
   })
 
   return null
