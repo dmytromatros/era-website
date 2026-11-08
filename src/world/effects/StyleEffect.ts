@@ -7,7 +7,10 @@ import type { PostSettings } from '../style'
  * - ink outlines where the depth jumps (object silhouettes against what is behind) — from the
  *   depth buffer the composer already has, so no extra scene render (no normal pass);
  *   relative threshold, so near and far edges look alike; faded with distance like fog;
- * - colour grade: saturation, contrast, tint, vignette.
+ * - crease lines where a surface bends (box edges, a table top against its side): on any flat
+ *   surface 1/depth changes linearly across the screen, so its second difference is ~0 —
+ *   where it is not, the surface bends. Same 4 depth samples, no normals needed;
+ * - colour grade: saturation, contrast, split toning (shadows / highlights tint), tint, vignette.
  * `mix` 0 = untouched picture. <Effects> raises it only after the 2D → 3D handover, so the swap
  * frame still matches the 2D page exactly.
  */
@@ -20,6 +23,9 @@ const fragmentShader = /* glsl */ `
   uniform float uContrast;
   uniform vec3 uTint;
   uniform float uVignette;
+  uniform float uCrease;         // strength of crease lines (0 = none)
+  uniform vec3 uShadowTint;
+  uniform vec3 uHighlightTint;
 
   float viewDepth(const in vec2 uv) {
     return -getViewZ(readDepth(uv));
@@ -33,6 +39,7 @@ const fragmentShader = /* glsl */ `
     float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
     vec3 g = mix(vec3(l), c, uSaturation);
     g = (g - 0.18) * uContrast + 0.18;
+    g *= mix(uShadowTint, uHighlightTint, smoothstep(0.05, 0.8, l));
     g *= uTint;
     // Vignette: 0 at the centre, 1 at the corners, whatever the aspect ratio.
     vec2 q = (uv - 0.5) * vec2(aspect, 1.0);
@@ -43,11 +50,17 @@ const fragmentShader = /* glsl */ `
     if (uOutline > 0.0) {
       float z = viewDepth(uv);
       vec2 o = texelSize * uOutline;
-      float dz = max(
-        max(abs(viewDepth(uv + vec2(o.x, 0.0)) - z), abs(viewDepth(uv - vec2(o.x, 0.0)) - z)),
-        max(abs(viewDepth(uv + vec2(0.0, o.y)) - z), abs(viewDepth(uv - vec2(0.0, o.y)) - z))
-      );
+      float zr = viewDepth(uv + vec2(o.x, 0.0));
+      float zl = viewDepth(uv - vec2(o.x, 0.0));
+      float zu = viewDepth(uv + vec2(0.0, o.y));
+      float zd = viewDepth(uv - vec2(0.0, o.y));
+      float dz = max(max(abs(zr - z), abs(zl - z)), max(abs(zu - z), abs(zd - z)));
       float edge = smoothstep(0.04 * z + 0.02, 0.1 * z + 0.05, dz);
+      // Crease: second difference of 1/depth, relative to 1/depth here.
+      float iz = 1.0 / max(z, 1e-3);
+      float bend = max(abs(1.0 / zr + 1.0 / zl - 2.0 * iz), abs(1.0 / zu + 1.0 / zd - 2.0 * iz)) / iz;
+      float crease = smoothstep(0.004, 0.012, bend) * uCrease;
+      edge = max(edge, crease);
       edge *= 1.0 - smoothstep(12.0, 40.0, z); // far lines would be noise
       g = mix(g, uOutlineColor, edge * uOutlineStrength);
     }
@@ -70,6 +83,9 @@ export class StyleEffect extends Effect {
         ['uContrast', new Uniform(1)],
         ['uTint', new Uniform(new Vector3(1, 1, 1))],
         ['uVignette', new Uniform(0)],
+        ['uCrease', new Uniform(0)],
+        ['uShadowTint', new Uniform(new Vector3(1, 1, 1))],
+        ['uHighlightTint', new Uniform(new Vector3(1, 1, 1))],
       ]),
     })
   }
@@ -96,5 +112,8 @@ export class StyleEffect extends Effect {
     u('uContrast').value = post.contrast
     ;(u('uTint').value as Vector3).set(...post.tint)
     u('uVignette').value = post.vignette
+    u('uCrease').value = post.crease
+    ;(u('uShadowTint').value as Vector3).set(...post.shadowTint)
+    ;(u('uHighlightTint').value as Vector3).set(...post.highlightTint)
   }
 }

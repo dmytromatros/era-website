@@ -1,13 +1,16 @@
 'use client'
 
+import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { Theme } from '@/theme/tokens'
 import { useTheme, useThemeStore } from '@/theme/store'
 import type { Box } from './layout'
 import type { Mat, Office as OfficeData, Prim } from './officeModel'
+import { useQualitySettings } from './quality'
+import { createScreenMaterial } from './screenMaterial'
 import { useStylePreset } from './style'
-import { applyToon } from './toonMaterial'
+import { applyToon, liveTime } from './toonMaterial'
 
 const BOX = new THREE.BoxGeometry(1, 1, 1)
 const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 16)
@@ -74,21 +77,22 @@ export function Office({ data, accent }: { data: OfficeData; accent?: string }) 
   const baseTheme = useTheme()
   const preset = useStylePreset()
   const themeName = useThemeStore((s) => s.name)
-  // The style's office palette (light theme only — the dark theme is still a draft).
-  const theme = useMemo<Theme>(
-    () =>
-      preset.palette && themeName === 'light'
-        ? { ...baseTheme, world: { ...baseTheme.world, office: { ...baseTheme.world.office, ...preset.palette } } }
-        : baseTheme,
-    [baseTheme, preset, themeName],
-  )
+  // The style's office palette for the current theme (A4).
+  const theme = useMemo<Theme>(() => {
+    const palette = themeName === 'dark' ? preset.paletteDark : preset.palette
+    return palette ? { ...baseTheme, world: { ...baseTheme.world, office: { ...baseTheme.world.office, ...palette } } } : baseTheme
+  }, [baseTheme, preset, themeName])
   const o = theme.world.office
 
   const groups = useMemo(
     () => ({
-      box: data.solid.filter((p) => p.shape === 'box'),
+      // Screens and foliage get their own instanced meshes: code scrolls on the screens and
+      // the plants sway (A5) — one extra draw call each.
+      box: data.solid.filter((p) => p.shape === 'box' && p.mat !== 'screen'),
+      screen: data.solid.filter((p) => p.shape === 'box' && p.mat === 'screen'),
       cyl: data.solid.filter((p) => p.shape === 'cyl'),
-      ball: data.solid.filter((p) => p.shape === 'ball'),
+      ball: data.solid.filter((p) => p.shape === 'ball' && p.mat !== 'plant' && p.mat !== 'plantDark'),
+      foliage: data.solid.filter((p) => p.shape === 'ball' && (p.mat === 'plant' || p.mat === 'plantDark')),
     }),
     [data],
   )
@@ -97,6 +101,8 @@ export function Office({ data, accent }: { data: OfficeData; accent?: string }) 
     const solid = new THREE.MeshStandardMaterial({ roughness: 0.85 })
     return {
       solid,
+      plant: new THREE.MeshStandardMaterial({ roughness: 0.85 }),
+      screen: createScreenMaterial(),
       glass: new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false, roughness: 0.1 }),
       frosted: new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false, roughness: 0.6 }),
       light: new THREE.MeshBasicMaterial(),
@@ -116,6 +122,7 @@ export function Office({ data, accent }: { data: OfficeData; accent?: string }) 
   // Cartoon light response for the opaque office surfaces (wow-plan A2; glass stays as is).
   useLayoutEffect(() => {
     applyToon(materials.solid, preset)
+    applyToon(materials.plant, preset, 'plant')
     applyToon(materials.ceiling, preset, 'ceiling')
   }, [materials, preset])
   useLayoutEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials])
@@ -123,12 +130,22 @@ export function Office({ data, accent }: { data: OfficeData; accent?: string }) 
   const colorBox = useMemo(() => (i: number) => matColor(theme, groups.box[i]!.mat, accent), [theme, groups, accent])
   const colorCyl = useMemo(() => (i: number) => matColor(theme, groups.cyl[i]!.mat, accent), [theme, groups, accent])
   const colorBall = useMemo(() => (i: number) => matColor(theme, groups.ball[i]!.mat, accent), [theme, groups, accent])
+  const colorScreen = useMemo(() => (i: number) => matColor(theme, groups.screen[i]!.mat, accent), [theme, groups, accent])
+  const colorFoliage = useMemo(() => (i: number) => matColor(theme, groups.foliage[i]!.mat, accent), [theme, groups, accent])
+
+  // Living details move only on quality levels that allow it (on `low` they hold still).
+  const { liveDetails } = useQualitySettings()
+  useFrame((_, delta) => {
+    if (liveDetails) liveTime.value += Math.min(delta, 0.1)
+  })
 
   return (
     <group>
       <Instanced items={groups.box} geometry={BOX} material={materials.solid} colorOf={colorBox} yawSign={1} />
       <Instanced items={groups.cyl} geometry={CYL} material={materials.solid} colorOf={colorCyl} yawSign={1} />
       <Instanced items={groups.ball} geometry={BALL} material={materials.solid} colorOf={colorBall} yawSign={1} />
+      <Instanced items={groups.foliage} geometry={BALL} material={materials.plant} colorOf={colorFoliage} yawSign={1} />
+      <Instanced items={groups.screen} geometry={BOX} material={materials.screen} colorOf={colorScreen} yawSign={1} />
       <Instanced items={data.frosted} geometry={BOX} material={materials.frosted} yawSign={-1} />
       <Instanced items={data.glass} geometry={BOX} material={materials.glass} yawSign={-1} />
       <Instanced items={data.lights} geometry={BOX} material={materials.light} yawSign={-1} />

@@ -45,6 +45,11 @@ export interface PostSettings {
   /** Multiplies the colour — a warm or cool cast. */
   tint: [number, number, number]
   vignette: number
+  /** Crease lines (where a surface bends), 0..1 of the outline strength (A3). */
+  crease: number
+  /** Split toning (A4): colour cast of the shadows and of the highlights. */
+  shadowTint: [number, number, number]
+  highlightTint: [number, number, number]
 }
 
 export interface StylePreset {
@@ -52,11 +57,13 @@ export interface StylePreset {
   toon: ToonSettings | null
   post: PostSettings | null
   /**
-   * Office colours of this style (light theme), over the theme's `world.office` (A4).
-   * Background, fog and floor are NOT here: they show at the 2D → 3D swap and must keep
+   * Office colours of this style, over the theme's `world.office` (A4): `palette` for the light
+   * theme, `paletteDark` for the dark one (a "night office"; the dark theme itself is still a
+   * draft). Background, fog and floor are NOT here: they show at the 2D → 3D swap and must keep
    * matching the 2D page.
    */
   palette?: Partial<Theme['world']['office']>
+  paletteDark?: Partial<Theme['world']['office']>
 }
 
 export const STYLE: Record<StyleName, StylePreset> = {
@@ -84,6 +91,9 @@ export const STYLE: Record<StyleName, StylePreset> = {
       contrast: 0.94,
       tint: [1.03, 1.0, 0.95],
       vignette: 0.12,
+      crease: 0.45,
+      shadowTint: [0.96, 0.94, 1.04],
+      highlightTint: [1.03, 1.0, 0.96],
     },
     palette: {
       ceiling: '#fbf5ee',
@@ -100,6 +110,22 @@ export const STYLE: Record<StyleName, StylePreset> = {
       bookA: '#f6b5a1',
       bookB: '#b9c8f2',
       bookC: '#f4dc8f',
+    },
+    paletteDark: {
+      ceiling: '#1c1b24',
+      wood: '#8a6a55',
+      woodDark: '#5e4838',
+      frame: '#3b3550',
+      metal: '#56506a',
+      fabricA: '#4f8f82',
+      fabricB: '#a4685c',
+      plant: '#4f8a62',
+      plantDark: '#3a6a4b',
+      pot: '#6b5a4a',
+      screen: '#14131c',
+      bookA: '#a4685c',
+      bookB: '#5f6fa8',
+      bookC: '#a8924f',
     },
   },
   comic: {
@@ -124,6 +150,9 @@ export const STYLE: Record<StyleName, StylePreset> = {
       contrast: 1.12,
       tint: [1, 1, 1],
       vignette: 0.2,
+      crease: 1,
+      shadowTint: [0.92, 0.95, 1.08],
+      highlightTint: [1.04, 1.01, 0.95],
     },
     palette: {
       ceiling: '#ffffff',
@@ -140,6 +169,22 @@ export const STYLE: Record<StyleName, StylePreset> = {
       bookA: '#ef476f',
       bookB: '#ffd166',
       bookC: '#118ab2',
+    },
+    paletteDark: {
+      ceiling: '#1b1d2a',
+      wood: '#b8692a',
+      woodDark: '#7a431c',
+      frame: '#05060a',
+      metal: '#4a5468',
+      fabricA: '#d6336c',
+      fabricB: '#1c7ed6',
+      plant: '#12b886',
+      plantDark: '#0b7a59',
+      pot: '#f08c00',
+      screen: '#0b0d17',
+      bookA: '#d6336c',
+      bookB: '#fab005',
+      bookC: '#1c7ed6',
     },
   },
 }

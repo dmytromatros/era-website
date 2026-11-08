@@ -31,6 +31,7 @@ function Label({
   onSync,
   position,
   anchor,
+  onSurface = false,
 }: {
   text: string
   style: TextStyle
@@ -39,8 +40,15 @@ function Label({
   onSync?: () => void
   position: [number, number, number]
   anchor: 'top-left' | 'center'
+  /**
+   * Text lying on a card / button face. It writes no depth: the opaque card under it already
+   * did, and the text's depth offset would read as a tiny step to the outline pass — the
+   * cartoon styles then drew crease lines around every glyph ("doubled" text).
+   */
+  onSurface?: boolean
 }) {
   const material = useFrontTextMaterial()
+  material.depthWrite = !onSurface
   return (
     <Text
       material={material}
@@ -179,6 +187,7 @@ export function ElementView({ spec, k, onSync }: Props) {
             onSync={onSync && (() => onSync(textKeys(spec)[0]!))}
             position={[0, 0, 0]}
             anchor="center"
+            onSurface
           />
         ) : (
           spec.parts.map((part, i) => (
@@ -191,6 +200,7 @@ export function ElementView({ spec, k, onSync }: Props) {
               onSync={onSync && (() => onSync(textKeys(spec)[i]!))}
               position={[-w / 2 + part.x * k, h / 2 - part.y * k, 0]}
               anchor="top-left"
+              onSurface
             />
           ))
         )}

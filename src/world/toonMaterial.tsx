@@ -20,6 +20,23 @@ import { useStylePreset, type StylePreset, type ToonSettings } from './style'
 /** Sun intensity of the current theme — bands are relative to it. Shared by all materials. */
 export const toonSun = { value: 1 }
 
+/**
+ * Time (s) of the office's living details (A5: wind in the plants, code on the screens).
+ * Shared uniform; advanced by <Office> only on quality levels that allow it.
+ */
+export const liveTime = { value: 0 }
+
+/** Wind sway for plant foliage (instanced): more at the top of each ball, out of phase per plant. */
+const WIND_GLSL = /* glsl */ `
+  #ifdef USE_INSTANCING
+    vec3 eraIp = instanceMatrix[3].xyz;
+    float eraPh = eraIp.x * 0.7 + eraIp.z * 0.9;
+    float eraW = sin(eraTime * 1.4 + eraPh) * 0.6 + sin(eraTime * 2.3 + eraPh * 1.7) * 0.4;
+    transformed.x += eraW * 0.08 * (position.y + 0.5);
+    transformed.z += eraW * 0.05 * (position.y + 0.5);
+  #endif
+`
+
 const f = (n: number) => n.toFixed(4)
 const v3 = (c: [number, number, number]) => `vec3(${c.map(f).join(',')})`
 
@@ -34,7 +51,14 @@ function bandsGlsl(t: ToonSettings): string {
   return code
 }
 
-function patch(shader: THREE.WebGLProgramParametersWithUniforms, t: ToonSettings) {
+function patch(shader: THREE.WebGLProgramParametersWithUniforms, t: ToonSettings | null, variant: ToonVariant) {
+  if (variant === 'plant') {
+    shader.uniforms.eraTime = liveTime
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float eraTime;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${WIND_GLSL}`)
+  }
+  if (!t) return
   shader.uniforms.eraSun = toonSun
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', '#include <common>\nuniform float eraSun;')
@@ -75,15 +99,15 @@ function patch(shader: THREE.WebGLProgramParametersWithUniforms, t: ToonSettings
 
 /**
  * Variants of the toon look for different surfaces. `ceiling` faces away from the sun — no
- * hatching there, it would cover the whole sky.
+ * hatching there, it would cover the whole sky. `plant` sways in the wind (A5).
  */
-export type ToonVariant = 'default' | 'ceiling'
+export type ToonVariant = 'default' | 'ceiling' | 'plant'
 
 /** Toon settings + program cache key of a style for a surface variant. */
 export function toonFor(preset: StylePreset, variant: ToonVariant): { toon: ToonSettings | null; key: string } {
-  if (!preset.toon) return { toon: null, key: preset.label }
+  if (!preset.toon) return { toon: null, key: `${preset.label}-${variant}` }
   if (variant === 'ceiling') return { toon: { ...preset.toon, hatch: 0 }, key: `${preset.label}-ceiling` }
-  return { toon: preset.toon, key: preset.label }
+  return { toon: preset.toon, key: `${preset.label}-${variant}` }
 }
 
 /**
@@ -92,7 +116,7 @@ export function toonFor(preset: StylePreset, variant: ToonVariant): { toon: Toon
  */
 export function applyToon(material: THREE.MeshStandardMaterial, preset: StylePreset, variant: ToonVariant = 'default') {
   const { toon, key } = toonFor(preset, variant)
-  material.onBeforeCompile = toon ? (shader) => patch(shader, toon) : () => {}
+  material.onBeforeCompile = (shader) => patch(shader, toon, variant)
   material.customProgramCacheKey = () => `era-toon-${key}`
   material.userData.eraToon = variant
   material.needsUpdate = true

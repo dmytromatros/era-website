@@ -19,13 +19,15 @@ export interface QualitySettings {
   multisampling: number
   /** Ink outlines of the cartoon styles (StyleEffect). */
   outlines: boolean
+  /** Living office details move: wind in the plants, code on the screens (A5). */
+  liveDetails: boolean
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true },
-  high: { dpr: 1.75, multisampling: 4, outlines: true },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true },
 }
 
 const STORAGE_KEY = 'era-quality'
