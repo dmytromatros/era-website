@@ -6,7 +6,10 @@ import { useExperience } from '@/experience/store'
 import { Atmosphere } from './Atmosphere'
 import { Driver } from './Driver'
 import { Effects } from './effects/Effects'
+import { DebugStats } from './DebugStats'
 import { Floor } from './Floor'
+import { Metrics } from './Metrics'
+import { QualityGovernor } from './QualityGovernor'
 import { setHtmlPortal } from './htmlPortal'
 import { SceneContent } from './SceneContent'
 import styles from './Scene.module.css'
@@ -36,8 +39,12 @@ export function Scene() {
         <Floor />
         {scene && <SceneContent key={scene.key} scene={scene} />}
         <Effects />
+        {/* Quality levels + per-frame cost (docs/wow-plan.md, A1). */}
+        <QualityGovernor />
+        <Metrics />
       </Canvas>
       <div className={styles.overlay} ref={setHtmlPortal} />
+      <DebugStats />
     </div>
   )
 }

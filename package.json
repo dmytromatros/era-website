@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "measure": "node scripts/measure-frame-cost.mjs"
   },
   "dependencies": {
     "@react-three/drei": "10.7.9",

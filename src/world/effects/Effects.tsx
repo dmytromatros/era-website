@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { EffectComposer } from '@react-three/postprocessing'
 import { useEffect, useMemo, useRef } from 'react'
 import { live, useExperience } from '@/experience/store'
+import { useQualitySettings } from '../quality'
 import { RippleEffect } from './RippleEffect'
 
 /** Post-processing stack. Fires the ripple whenever the store's `rippleAt` changes. */
@@ -11,6 +12,7 @@ export function Effects() {
   const ripple = useMemo(() => new RippleEffect(), [])
   const size = useThree((s) => s.size)
   const seen = useRef(-Infinity)
+  const { multisampling } = useQualitySettings()
 
   useEffect(() => () => ripple.dispose(), [ripple])
 
@@ -28,7 +30,7 @@ export function Effects() {
   })
 
   return (
-    <EffectComposer multisampling={4}>
+    <EffectComposer multisampling={multisampling}>
       <primitive object={ripple} />
     </EffectComposer>
   )
