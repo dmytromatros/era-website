@@ -76,7 +76,7 @@ function Arm({
 }
 
 /** Stable per-actor phase so idle loops of different characters are not in sync. */
-function phaseOf(id: string): number {
+export function phaseOf(id: string): number {
   let h = 0
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 997
   return h * 0.173

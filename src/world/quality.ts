@@ -21,13 +21,18 @@ export interface QualitySettings {
   outlines: boolean
   /** Living office details move: wind in the plants, code on the screens (A5). */
   liveDetails: boolean
+  /**
+   * Hero heading letters spring from the cursor and sway (B1). On everywhere: a few dozen
+   * springs on the CPU and one uniform upload per frame, no extra draw calls.
+   */
+  kineticText: boolean
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true },
-  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true },
 }
 
 const STORAGE_KEY = 'era-quality'

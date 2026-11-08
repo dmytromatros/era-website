@@ -3,6 +3,8 @@
 import { useThree } from '@react-three/fiber'
 import { useMemo } from 'react'
 import * as THREE from 'three'
+import { phaseOf } from '@/actors/Actor'
+import { HOLDING_RATE } from '@/actors/activities'
 import { Door3D } from '@/blocks/door/Door3D'
 import { DOOR_SPACING, hrefOfSceneKey, portalDoors } from '@/blocks/door/doors'
 import type { SceneData } from '@/experience/store'
@@ -12,6 +14,7 @@ import { Decor } from './Decor'
 import { buildExhibit, type ExhibitModel } from './exhibitModel'
 import { Exhibit } from './Exhibit'
 import { HeroTransit, type TransitItem } from './HeroTransit'
+import type { KineticOptions } from './KineticText'
 import { ENTRANCE_GEOMETRY, layoutRoute, type ExhibitSize } from './layout'
 import { ArrivalDoor } from './ArrivalDoor'
 import { Membrane } from './Membrane'
@@ -23,6 +26,8 @@ import { moduleRailRange } from './widgetZone'
 
 const VISIBLE_HEIGHT =
   2 * ENTRANCE_GEOMETRY.heroDistance * Math.tan(THREE.MathUtils.degToRad(ENTRANCE_GEOMETRY.fov / 2))
+/** The one element whose letters come alive (B1): the hero heading — a signature moment, not on every text. */
+const KINETIC_ELEMENT = 'heading'
 /** The portal hall: one door per page, side by side. */
 const hallSize = (doors: number): ExhibitSize => ({ width: (doors - 1) * DOOR_SPACING + 2.4, height: 3.6 })
 
@@ -60,14 +65,29 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       size.width / size.height,
     )
     // Hero elements fly from the 2D page to their spots in the hero exhibits.
+    const hero = page.blocks[0]
+    const heldBy = hero && 'helpers' in hero ? hero.helpers.find((h) => h.target === KINETIC_ELEMENT && h.pose === 'holding') : undefined
+    const heroZone = moduleRailRange(plan, timing, 0)
+    const kinetic: KineticOptions | undefined =
+      hero?.type === 'hero' && heroZone
+        ? {
+            zone: heroZone,
+            segments: timing.segments,
+            holder: heldBy ? { phase: phaseOf(heldBy.actor), rate: HOLDING_RATE } : null,
+          }
+        : undefined
     const transit: TransitItem[] = plan.stops.flatMap((stop, i) => {
       const model = models[i]
       if (stop.blockIndex !== 0 || !model) return []
       const { anchor, yaw } = layout.stations[i]!
-      return model.elements.map(({ spec, local }) => ({ spec, target: { local, anchor, yaw } }))
+      return model.elements.map(({ spec, local }) => ({
+        spec,
+        target: { local, anchor, yaw },
+        kinetic: spec.id === KINETIC_ELEMENT ? kinetic : undefined,
+      }))
     })
     return { models, layout, transit, office: buildOffice(layout, style.seed) }
-  }, [measured, plan, page, k, size, nav, currentHref, style.seed])
+  }, [measured, plan, timing, page, k, size, nav, currentHref, style.seed])
 
   if (!world) return <Membrane />
 

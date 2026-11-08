@@ -9,6 +9,7 @@ import { useExperience } from '@/experience/store'
 import { isInternal } from '@/lib/href'
 import { fontFor } from '@/theme/typography'
 import { Slab } from './Slab'
+import { useKineticText, type KineticOptions } from './KineticText'
 import { useFrontTextMaterial } from './textMaterial'
 import { WidgetPlane } from './WidgetPlane'
 import { TEXT_DEPTH_OFFSET } from './depthOffset'
@@ -21,7 +22,11 @@ interface Props {
   k: number
   /** Called with a text's key (see `textKeys`) whenever its glyphs are ready. */
   onSync?: (key: string) => void
+  /** Text elements only: letters come alive after the landing (B1). */
+  kinetic?: KineticOptions
 }
+
+type LabelProps = Parameters<typeof Label>[0]
 
 function Label({
   text,
@@ -32,12 +37,14 @@ function Label({
   position,
   anchor,
   onSurface = false,
+  material: override,
 }: {
   text: string
   style: TextStyle
   k: number
   maxWidth?: number
-  onSync?: () => void
+  /** Gets the troika mesh once its glyphs are built. */
+  onSync?: (mesh: THREE.Mesh) => void
   position: [number, number, number]
   anchor: 'top-left' | 'center'
   /**
@@ -46,8 +53,11 @@ function Label({
    * cartoon styles then drew crease lines around every glyph ("doubled" text).
    */
   onSurface?: boolean
+  /** Replaces the plain front-side text material (a kinetic text's own one). */
+  material?: THREE.MeshBasicMaterial
 }) {
-  const material = useFrontTextMaterial()
+  const front = useFrontTextMaterial()
+  const material = override ?? front
   material.depthWrite = !onSurface
   return (
     <Text
@@ -68,6 +78,21 @@ function Label({
     >
       {text}
     </Text>
+  )
+}
+
+/** A Label whose letters spring from the cursor and sway (task B1, KineticText.tsx). */
+function KineticLabel({ kinetic, onSync, ...props }: LabelProps & { kinetic: KineticOptions }) {
+  const live = useKineticText(kinetic, props.style.fontSize * props.k)
+  return (
+    <Label
+      {...props}
+      material={live.material}
+      onSync={(mesh) => {
+        live.onSync(mesh)
+        onSync?.(mesh)
+      }}
+    />
   )
 }
 
@@ -136,25 +161,24 @@ function Linked({ href, children }: { href?: string; children: ReactNode }) {
 }
 
 /** A measured 2D element rebuilt in 3D, centred on its origin. Same size, font and colours. */
-export function ElementView({ spec, k, onSync }: Props) {
+export function ElementView({ spec, k, onSync, kinetic }: Props) {
   const w = spec.width * k
   const h = spec.height * k
   // A pixel of slack so text wraps where the browser wrapped it, not one word earlier.
   const slack = 2 * k
 
   if (spec.kind === 'text') {
+    const label: LabelProps = {
+      text: spec.text,
+      style: spec.style,
+      k,
+      maxWidth: w + slack,
+      onSync: onSync && (() => onSync(textKeys(spec)[0]!)),
+      position: [-w / 2, h / 2, 0],
+      anchor: 'top-left',
+    }
     return (
-      <Linked href={spec.href}>
-        <Label
-          text={spec.text}
-          style={spec.style}
-          k={k}
-          maxWidth={w + slack}
-          onSync={onSync && (() => onSync(textKeys(spec)[0]!))}
-          position={[-w / 2, h / 2, 0]}
-          anchor="top-left"
-        />
-      </Linked>
+      <Linked href={spec.href}>{kinetic ? <KineticLabel {...label} kinetic={kinetic} /> : <Label {...label} />}</Linked>
     )
   }
 

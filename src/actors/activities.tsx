@@ -15,6 +15,9 @@ import type { ActivityName } from './catalog'
 import type { Joints } from './rig'
 import { StyledMaterial } from '@/world/toonMaterial'
 
+/** Rate of the `holding` strain; a held kinetic heading sways in time with it (KineticText). */
+export const HOLDING_RATE = 2.4
+
 export interface PropProps {
   palette: ActorDef['palette']
 }
@@ -258,7 +261,7 @@ export const activities: Record<ActivityName, Activity> = {
   /** Holds the element above its head so it does not fall (element is lifted to fit). */
   holding: {
     animate: (j, t) => {
-      const strain = Math.sin(t * 2.4) * 0.05
+      const strain = Math.sin(t * HOLDING_RATE) * 0.05
       j.armL.rotation.set(-0.15, 0, -2.78 + strain)
       j.armR.rotation.set(-0.15, 0, 2.78 - strain)
       j.head.rotation.x = -0.32 + Math.sin(t * 0.9) * 0.05

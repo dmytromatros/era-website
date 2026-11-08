@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import type { ElementSpec } from '@/experience/measure'
 import { live, useExperience } from '@/experience/store'
 import { ElementView, textKeys } from './ElementView'
+import type { KineticOptions } from './KineticText'
 import { toWorld, type Vec3 } from './exhibitModel'
 import { ENTRANCE_GEOMETRY } from './layout'
 import { ENTRANCE } from './timeline'
@@ -17,6 +18,8 @@ export interface TransitItem {
   spec: ElementSpec
   /** Where the element ends up (its spot in a hero exhibit). */
   target: { local: Vec3; anchor: Vec3; yaw: number }
+  /** Letters come alive after the landing (B1) — the hero heading only. */
+  kinetic?: KineticOptions
 }
 
 type Fadeable = { fillOpacity?: number; material?: THREE.Material | THREE.Material[] }
@@ -117,9 +120,9 @@ export function HeroTransit({
 
   return (
     <group ref={group}>
-      {items.map(({ spec }, i) => (
+      {items.map(({ spec, kinetic }, i) => (
         <group key={spec.id} position={poses[i]!.from}>
-          <ElementView spec={spec} k={k} onSync={onSync} />
+          <ElementView spec={spec} k={k} onSync={onSync} kinetic={kinetic} />
         </group>
       ))}
     </group>
