@@ -28,13 +28,17 @@ export interface QualitySettings {
   kineticText: boolean
   /** Background blur (B3): samples per pixel, 0 = off (no pass at all). */
   depthBlur: number
+  /** Live view through the portal doors (B2): texture size as a fraction of the screen (0 = off)… */
+  portalScale: number
+  /** …and at most this many redraws a second (0 = whenever the camera moves). */
+  portalMaxFps: number
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, depthBlur: 0 },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, depthBlur: 8 },
-  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, depthBlur: 16 },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10 },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0 },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, depthBlur: 16, portalScale: 1, portalMaxFps: 0 },
 }
 
 const STORAGE_KEY = 'era-quality'

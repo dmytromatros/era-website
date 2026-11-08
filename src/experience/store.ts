@@ -13,6 +13,11 @@ export interface SceneData {
   actors: Record<string, ActorDef>
   /** Site navigation (locale-less hrefs) — the portal hall has a door for each page. */
   nav: { label: string; href: string }[]
+  /**
+   * Content of the other pages in the navigation, by locale-less href — the portal doors show a
+   * live view of the page behind them (B2). Optional: older scene objects may lack it.
+   */
+  previews?: Record<string, Page>
 }
 
 /**

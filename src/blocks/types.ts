@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { Block, BlockType, DoorBlock } from '@/content/schema'
+import type { Block, BlockType, DoorBlock, Page } from '@/content/schema'
 import type { StationLayout } from '@/world/layout'
 import type { Timing } from '@/world/route'
 
@@ -31,4 +31,6 @@ export interface Custom3DProps {
   nav: { label: string; href: string }[]
   /** Locale-less href of the current page (no door to where you already are). */
   currentHref: string
+  /** Other pages' content by locale-less href — each door shows its page live (B2). */
+  previews: Record<string, Page>
 }

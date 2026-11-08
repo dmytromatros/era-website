@@ -26,6 +26,16 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/[[...slu
 
 export default async function Page({ params }: PageProps<'/[locale]/[[...slug]]'>) {
   const { locale, slug, page } = await load(params)
+  const nav = readSite().nav[locale] ?? []
+  const here = `/${slug.join('/')}`
+  // The other pages' content, for the live views in the portal doors (B2).
+  const previews = Object.fromEntries(
+    nav.flatMap((item) => {
+      if (item.href === here) return []
+      const other = readPage(locale, item.href.split('/').filter(Boolean))
+      return other ? [[item.href, other] as const] : []
+    }),
+  )
   return (
     <PageView
       scene={{
@@ -33,7 +43,8 @@ export default async function Page({ params }: PageProps<'/[locale]/[[...slug]]'
         locale,
         page,
         actors: readActorsFor(page),
-        nav: readSite().nav[locale] ?? [],
+        nav,
+        previews,
       }}
     />
   )

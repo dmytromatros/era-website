@@ -36,13 +36,20 @@ export function portalDoors(
 /** Spacing between door centres in the hall (metres). */
 export const DOOR_SPACING = 2.9
 
-/** Local x of each door: the primary in the middle, the others alternating right / left. */
+/**
+ * Local x of each door: the primary in the middle, the others alternating right / left — and
+ * the whole row centred on the hall, which the camera frames. With an even count the primary
+ * sits just left of centre (two doors: −1.45 / +1.45). Before, the primary was pinned to 0 and
+ * the pair stood 1.45 m right of the frame, the right door cut by the screen edge.
+ */
 export function doorOffsets(count: number): number[] {
-  return Array.from({ length: count }, (_, i) => {
+  const raw = Array.from({ length: count }, (_, i) => {
     if (i === 0) return 0
     const slot = Math.ceil(i / 2)
     return (i % 2 === 1 ? 1 : -1) * slot * DOOR_SPACING
   })
+  const mid = count ? (Math.min(...raw) + Math.max(...raw)) / 2 : 0
+  return raw.map((x) => x - mid)
 }
 
 /** Locale-less href of the current page from its scene key (`en/` → `/`, `en/contacts` → `/contacts`). */

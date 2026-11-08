@@ -73,7 +73,19 @@ function Instanced({
  * cylinders and balls (per-instance colours from the theme), glass, frosted glass, ceiling
  * lights, windows, and the ceiling plane.
  */
-export function Office({ data, accent }: { data: OfficeData; accent?: string }) {
+export function Office({
+  data,
+  accent,
+  tickTime = true,
+}: {
+  data: OfficeData
+  accent?: string
+  /**
+   * Whether this office advances the shared `liveTime`. Only the page's own office does: the
+   * offices seen through the portal doors (B2) would otherwise speed the plants and screens up.
+   */
+  tickTime?: boolean
+}) {
   const baseTheme = useTheme()
   const preset = useStylePreset()
   const themeName = useThemeStore((s) => s.name)
@@ -136,7 +148,7 @@ export function Office({ data, accent }: { data: OfficeData; accent?: string }) 
   // Living details move only on quality levels that allow it (on `low` they hold still).
   const { liveDetails } = useQualitySettings()
   useFrame((_, delta) => {
-    if (liveDetails) liveTime.value += Math.min(delta, 0.1)
+    if (liveDetails && tickTime) liveTime.value += Math.min(delta, 0.1)
   })
 
   return (

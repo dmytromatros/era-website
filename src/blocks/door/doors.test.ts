@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { sceneKeyOf } from '@/experience/portal'
 import { hashKey, officeStyle } from '@/world/officeStyle'
-import { doorOffsets, hrefOfSceneKey, portalDoors } from './doors'
+import { DOOR_SPACING, doorOffsets, hrefOfSceneKey, portalDoors } from './doors'
 
 const nav = [
   { label: 'Home', href: '/' },
@@ -33,6 +33,16 @@ describe('portal hall doors', () => {
     expect(a).toBe(0)
     expect(b).toBeGreaterThan(0)
     expect(c).toBeCloseTo(-b!)
+  })
+
+  it('centres the whole row on the hall (two doors: primary left, the other right)', () => {
+    for (const n of [1, 2, 3, 4, 5]) {
+      const xs = doorOffsets(n)
+      expect(Math.min(...xs) + Math.max(...xs)).toBeCloseTo(0)
+    }
+    const [primary, other] = doorOffsets(2)
+    expect(primary).toBeCloseTo(-DOOR_SPACING / 2)
+    expect(other).toBeCloseTo(DOOR_SPACING / 2)
   })
 })
 

@@ -36,6 +36,7 @@ export function SceneContent({ scene }: { scene: SceneData }) {
   const { page, locale, actors } = scene
   // older scene objects (e.g. after a hot reload) may lack nav
   const nav = useMemo(() => scene.nav ?? [], [scene.nav])
+  const previews = useMemo(() => scene.previews ?? {}, [scene.previews])
   const currentHref = hrefOfSceneKey(scene.key)
   const arrivedHere = useExperience((s) => s.arrivedVia === scene.key)
   const style = useMemo(() => officeStyle(scene.key, page), [scene.key, page])
@@ -131,6 +132,7 @@ export function SceneContent({ scene }: { scene: SceneData }) {
             timing={timing}
             nav={nav}
             currentHref={currentHref}
+            previews={previews}
           />
         ) : null
       })}
