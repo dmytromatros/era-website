@@ -11,6 +11,7 @@ import { fontFor } from '@/theme/typography'
 import { Slab } from './Slab'
 import { useFrontTextMaterial } from './textMaterial'
 import { WidgetPlane } from './WidgetPlane'
+import { TEXT_DEPTH_OFFSET } from './depthOffset'
 
 const DEPTH = 0.05
 
@@ -43,6 +44,8 @@ function Label({
   return (
     <Text
       material={material}
+      // Text lies on card faces: win the depth test on low-precision (mobile) GPUs too.
+      depthOffset={TEXT_DEPTH_OFFSET}
       font={fontFor(style.fontWeight)}
       fontSize={style.fontSize * k}
       letterSpacing={style.letterSpacing}
@@ -149,18 +152,23 @@ export function ElementView({ spec, k, onSync }: Props) {
 
   const box = spec.box!
   const border = box.borderColor ? k : 0
+  // Slabs are OPAQUE: drawn in the opaque pass, always before the (transparent) text and the
+  // widget plane on them. A transparent slab drawn after its text fails the depth test where
+  // the text's empty glyph quads already wrote depth — holes in the card (seen on phones).
+  // A see-through CSS background keeps the slab transparent.
+  const seeThrough = /rgba\(.*,\s*0(\.\d+)?\)$/.test(box.background)
   const radius = Math.min(box.radius * k, h / 2, w / 2)
   return (
     <Linked href={spec.href}>
       {border > 0 && (
-        <group position-z={-0.002}>
-          <Slab width={w} height={h} radius={radius} depth={DEPTH * 0.9}>
-            <meshBasicMaterial color={box.borderColor} transparent />
-          </Slab>
-        </group>
+        // Border = a frame around the card slab (Slab inset), side by side with it — never a
+        // slab behind it: overlapping faces fight for depth on phones (grey patches).
+        <Slab width={w} height={h} radius={radius} depth={DEPTH} inset={border}>
+          <meshBasicMaterial color={box.borderColor} />
+        </Slab>
       )}
       <Slab width={w - border * 2} height={h - border * 2} radius={Math.max(radius - border, 0)} depth={DEPTH}>
-        <meshBasicMaterial color={box.background} transparent />
+        <meshBasicMaterial color={box.background} transparent={seeThrough} />
       </Slab>
       <group position-z={DEPTH / 2 + 0.002}>
         {spec.kind === 'button' ? (
@@ -190,6 +198,7 @@ export function ElementView({ spec, k, onSync }: Props) {
           <WidgetPlane
             key={i}
             widget={widget}
+            background={box.background}
             k={k}
             position={[-w / 2 + (widget.x + widget.width / 2) * k, h / 2 - (widget.y + widget.height / 2) * k, -0.001]}
           />

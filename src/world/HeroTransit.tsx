@@ -21,11 +21,23 @@ export interface TransitItem {
 
 type Fadeable = { fillOpacity?: number; material?: THREE.Material | THREE.Material[] }
 
+/**
+ * Hide / show a hero element. Card and button slabs are opaque (see ElementView); they turn
+ * transparent only while hidden, so a visible slab is always drawn before the text on it.
+ */
 function setOpacity(obj: THREE.Object3D, value: number) {
   obj.traverse((o) => {
     const f = o as THREE.Object3D & Fadeable
     if (typeof f.fillOpacity === 'number') f.fillOpacity = value
-    else if (f.material && !Array.isArray(f.material)) f.material.opacity = value
+    else if (f.material && !Array.isArray(f.material)) {
+      const m = f.material
+      m.opacity = value
+      const transparent = value < 1
+      if (m.transparent !== transparent) {
+        m.transparent = transparent
+        m.needsUpdate = true
+      }
+    }
   })
 }
 

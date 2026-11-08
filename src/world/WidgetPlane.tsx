@@ -7,6 +7,7 @@ import type { WidgetSpec } from '@/experience/measure'
 import { live, useExperience } from '@/experience/store'
 import { isWidgetName, widgets } from '@/blocks/widgets/registry'
 import { useTheme } from '@/theme/store'
+import { ON_SURFACE } from './depthOffset'
 import { timeline } from './timeline'
 import { WidgetZoneContext, zoneOpacity } from './widgetZone'
 
@@ -22,7 +23,18 @@ const TEXEL = 2
  *
  * `position` is the widget's centre in the card's local coordinates; `k` = world units per px.
  */
-export function WidgetPlane({ widget: spec, k, position }: { widget: WidgetSpec; k: number; position: [number, number, number] }) {
+export function WidgetPlane({
+  widget: spec,
+  background,
+  k,
+  position,
+}: {
+  widget: WidgetSpec
+  /** The card's colour (CSS). The widget is painted on it, so the plane is fully opaque. */
+  background: string
+  k: number
+  position: [number, number, number]
+}) {
   const widget = isWidgetName(spec.name) ? widgets[spec.name] : null
   const zoneCtx = useContext(WidgetZoneContext)
   const ui = useTheme().ui
@@ -44,6 +56,10 @@ export function WidgetPlane({ widget: spec, k, position }: { widget: WidgetSpec;
   // The widget's own state object (mutated in place by draw/click).
   const [state] = useState(() => widget?.init() ?? null)
   const drawn = useRef(false)
+  // Opaque plane (painted on the card colour): no see-through pixels, so it can never punch a
+  // hole in the card when it happens to be drawn before it. Only a see-through card keeps it
+  // transparent.
+  const opaque = !/rgba\(.*,\s*0(\.\d+)?\)$/.test(background)
   const hovered = useRef(false)
 
   useFrame(() => {
@@ -53,6 +69,10 @@ export function WidgetPlane({ widget: spec, k, position }: { widget: WidgetSpec;
     drawn.current = true
     ctx.setTransform(TEXEL, 0, 0, TEXEL, 0, 0)
     ctx.clearRect(0, 0, w, h)
+    if (opaque) {
+      ctx.fillStyle = background
+      ctx.fillRect(0, 0, w, h)
+    }
     widget.draw({ ctx, t: performance.now() / 1000, w, h, state, ui })
     texture.needsUpdate = true
   })
@@ -84,8 +104,8 @@ export function WidgetPlane({ widget: spec, k, position }: { widget: WidgetSpec;
       }}
     >
       <planeGeometry args={[w * k, h * k]} />
-      {/* depthWrite stays on: whichever of card and plane is drawn first, the plane wins in front. */}
-      <meshBasicMaterial map={texture} transparent toneMapped={false} />
+      {/* Opaque, and ON_SURFACE: it lies 0.001 above the card — see depthOffset.ts. */}
+      <meshBasicMaterial map={texture} transparent={!opaque} toneMapped={false} {...ON_SURFACE} />
     </mesh>
   )
 }
