@@ -10,6 +10,7 @@ import { DebugStats } from './DebugStats'
 import { Floor } from './Floor'
 import { Metrics } from './Metrics'
 import { QualityGovernor } from './QualityGovernor'
+import { StylePrecompile } from './StylePrecompile'
 import { setHtmlPortal } from './htmlPortal'
 import { SceneContent } from './SceneContent'
 import styles from './Scene.module.css'
@@ -42,6 +43,8 @@ export function Scene() {
         {/* Quality levels + per-frame cost (docs/wow-plan.md, A1). */}
         <QualityGovernor />
         <Metrics />
+        {/* Both looks compiled ahead, so the Comic ↔ Pastel switch does not hitch. */}
+        <StylePrecompile />
       </Canvas>
       <div className={styles.overlay} ref={setHtmlPortal} />
       <DebugStats />

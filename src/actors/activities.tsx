@@ -13,6 +13,7 @@ import type * as THREE from 'three'
 import type { ActorDef } from '@/content/schema'
 import type { ActivityName } from './catalog'
 import type { Joints } from './rig'
+import { StyledMaterial } from '@/world/toonMaterial'
 
 export interface PropProps {
   palette: ActorDef['palette']
@@ -37,21 +38,21 @@ function Desk({ palette }: PropProps) {
     <group position={[0, 0, 0.62]}>
       <mesh position={[0, 0.88, 0]}>
         <boxGeometry args={[1, 0.06, 0.5]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.6} />
+        <StyledMaterial color="#ffffff" roughness={0.6} />
       </mesh>
       <mesh position={[0, 0.44, 0]}>
         <boxGeometry args={[0.12, 0.86, 0.12]} />
-        <meshStandardMaterial color="#d9d9d4" />
+        <StyledMaterial color="#d9d9d4" />
       </mesh>
       {/* laptop */}
       <mesh position={[0, 0.925, 0.02]}>
         <boxGeometry args={[0.56, 0.03, 0.36]} />
-        <meshStandardMaterial color="#c9ccd3" metalness={0.3} roughness={0.4} />
+        <StyledMaterial color="#c9ccd3" metalness={0.3} roughness={0.4} />
       </mesh>
       <group position={[0, 0.94, 0.2]} rotation-x={0.3}>
         <mesh position={[0, 0.18, 0]}>
           <boxGeometry args={[0.56, 0.36, 0.02]} />
-          <meshStandardMaterial color="#c9ccd3" metalness={0.3} roughness={0.4} />
+          <StyledMaterial color="#c9ccd3" metalness={0.3} roughness={0.4} />
         </mesh>
         <mesh position={[0, 0.18, -0.012]}>
           <planeGeometry args={[0.5, 0.3]} />
@@ -68,15 +69,15 @@ function Easel({ palette }: PropProps) {
     <group position={[0.62, 0, 0.55]} rotation-y={-0.7}>
       <mesh position={[-0.22, 0.6, -0.08]} rotation-z={0.12}>
         <boxGeometry args={[0.05, 1.3, 0.05]} />
-        <meshStandardMaterial color="#9c6b3f" />
+        <StyledMaterial color="#9c6b3f" />
       </mesh>
       <mesh position={[0.22, 0.6, -0.08]} rotation-z={-0.12}>
         <boxGeometry args={[0.05, 1.3, 0.05]} />
-        <meshStandardMaterial color="#9c6b3f" />
+        <StyledMaterial color="#9c6b3f" />
       </mesh>
       <mesh position={[0, 1.2, 0]} rotation-x={-0.1}>
         <boxGeometry args={[0.72, 0.56, 0.03]} />
-        <meshStandardMaterial color="#ffffff" />
+        <StyledMaterial color="#ffffff" />
       </mesh>
       {strokes.map((c, i) => (
         <mesh key={i} position={[-0.2 + i * 0.13, 1.12 + (i % 2) * 0.12, 0.022]} rotation={[-0.1, 0, i * 0.5]}>
@@ -92,7 +93,7 @@ function Brush() {
   return (
     <mesh position={[0, -0.05, 0.08]} rotation-x={1.2}>
       <cylinderGeometry args={[0.015, 0.02, 0.32, 6]} />
-      <meshStandardMaterial color="#222222" />
+      <StyledMaterial color="#222222" />
     </mesh>
   )
 }
@@ -101,7 +102,7 @@ function PaintPalette({ palette }: PropProps) {
   return (
     <mesh position={[0, -0.04, 0.12]} rotation-x={Math.PI / 2 - 0.3}>
       <cylinderGeometry args={[0.16, 0.16, 0.02, 20]} />
-      <meshStandardMaterial color={palette.accent} />
+      <StyledMaterial color={palette.accent} />
     </mesh>
   )
 }
@@ -118,7 +119,7 @@ function FloatingCube({ palette }: PropProps) {
   return (
     <mesh ref={ref} position={[0, 1.5, 0.62]}>
       <boxGeometry args={[0.34, 0.34, 0.34]} />
-      <meshStandardMaterial color={palette.accent} roughness={0.3} metalness={0.1} />
+      <StyledMaterial color={palette.accent} roughness={0.3} metalness={0.1} />
     </mesh>
   )
 }
@@ -138,7 +139,7 @@ function JuggleBalls({ palette }: PropProps) {
       {colors.map((c, i) => (
         <mesh key={i}>
           <sphereGeometry args={[0.075, 16, 12]} />
-          <meshStandardMaterial color={c} roughness={0.35} />
+          <StyledMaterial color={c} roughness={0.35} />
         </mesh>
       ))}
     </group>
@@ -157,7 +158,7 @@ function ChartBoard({ palette }: PropProps) {
   return (
     <group position={[-1.05, 1.45, 0.35]} rotation-y={0.55}>
       <RoundedBox args={[1, 0.8, 0.04]} radius={0.03} smoothness={3}>
-        <meshStandardMaterial color="#ffffff" />
+        <StyledMaterial color="#ffffff" />
       </RoundedBox>
       <group ref={bars} position={[0, 0, 0.03]}>
         {[0, 1, 2].map((i) => (

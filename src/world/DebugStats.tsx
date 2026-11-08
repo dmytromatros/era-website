@@ -18,7 +18,7 @@ export function DebugStats() {
       const m = metrics
       setText(
         `${m.fps.toFixed(0)} fps · ${m.calls} calls · ${(m.triangles / 1000).toFixed(1)}k tris · ` +
-          `${m.geometries} geo · ${m.textures} tex · ${m.level}`,
+          `${m.geometries} geo · ${m.textures} tex · ${m.programs} prog · ${m.level}`,
       )
     }, 500)
     return () => clearInterval(id)

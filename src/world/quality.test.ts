@@ -34,6 +34,7 @@ describe('quality levels', () => {
       const higher = QUALITY[LEVELS[i]!]
       expect(lower.dpr).toBeLessThanOrEqual(higher.dpr)
       expect(lower.multisampling).toBeLessThanOrEqual(higher.multisampling)
+      expect(Number(lower.outlines)).toBeLessThanOrEqual(Number(higher.outlines))
     }
   })
 })

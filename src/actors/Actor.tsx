@@ -9,6 +9,7 @@ import { accessories } from './accessories'
 import { activities, greet, type PropProps } from './activities'
 import type { ActivityName } from './catalog'
 import { BODY, resetPose, resolveJoints } from './rig'
+import { StyledMaterial } from '@/world/toonMaterial'
 
 interface Props {
   def: ActorDef
@@ -26,7 +27,7 @@ const SHOE = '#232326'
 const GREET_SECONDS = 1.8
 
 function Mat({ color }: { color: string }) {
-  return <meshStandardMaterial color={color} roughness={0.7} />
+  return <StyledMaterial color={color} roughness={0.7} />
 }
 
 function Leg({ ref, x, palette }: { ref: Ref<THREE.Group>; x: number; palette: Palette }) {

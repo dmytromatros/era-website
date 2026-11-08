@@ -7,6 +7,7 @@ import type { ExhibitModel } from './exhibitModel'
 import { Helper } from './Helper'
 import type { StationLayout } from './layout'
 import type { Timing } from './route'
+import { StyledMaterial } from './toonMaterial'
 import { WidgetZoneContext, type RailRange } from './widgetZone'
 
 interface Props {
@@ -40,11 +41,11 @@ export function Exhibit({ model, station, stopIndex, timing, zone, actors, k, sh
           <group key={i} position={[x, 0, -0.06]}>
             <mesh position={[0, model.elevation / 2, 0]}>
               <boxGeometry args={[0.05, model.elevation, 0.05]} />
-              <meshStandardMaterial color={office.frame} roughness={0.5} />
+              <StyledMaterial color={office.frame} roughness={0.5} />
             </mesh>
             <mesh position={[0, 0.015, 0]}>
               <boxGeometry args={[0.36, 0.03, 0.36]} />
-              <meshStandardMaterial color={office.frame} roughness={0.5} />
+              <StyledMaterial color={office.frame} roughness={0.5} />
             </mesh>
           </group>
         ))}

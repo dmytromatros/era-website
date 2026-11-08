@@ -17,13 +17,15 @@ export interface QualitySettings {
   dpr: number
   /** MSAA samples of the post-processing target (0 = off). */
   multisampling: number
+  /** Ink outlines of the cartoon styles (StyleEffect). */
+  outlines: boolean
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0 },
-  medium: { dpr: 1.25, multisampling: 2 },
-  high: { dpr: 1.75, multisampling: 4 },
+  low: { dpr: 1, multisampling: 0, outlines: false },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true },
+  high: { dpr: 1.75, multisampling: 4, outlines: true },
 }
 
 const STORAGE_KEY = 'era-quality'

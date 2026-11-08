@@ -1,10 +1,16 @@
 'use client'
 
+import { useLayoutEffect } from 'react'
 import { useTheme } from '@/theme/store'
+import { toonSun } from './toonMaterial'
 
 /** Background, fog and lights — all from the current theme. */
 export function Atmosphere() {
   const { world } = useTheme()
+  // Cartoon bands are relative to the sun's strength (toonMaterial.tsx).
+  useLayoutEffect(() => {
+    toonSun.value = world.sunIntensity
+  }, [world.sunIntensity])
   return (
     <>
       <color attach="background" args={[world.background]} />

@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { portalTo } from '@/experience/portal'
 import { live, useExperience } from '@/experience/store'
 import { localizeHref } from '@/lib/href'
+import { StyledMaterial } from '@/world/toonMaterial'
 import { useTheme } from '@/theme/store'
 import { FONT_BOLD, FONT_MEDIUM } from '@/theme/typography'
 import { htmlPortal } from '@/world/htmlPortal'
@@ -90,12 +91,12 @@ export function DoorFrame({ color }: { color: string }) {
       {[-1, 1].map((s) => (
         <mesh key={s} position={[s * 0.98, 1.4, 0]}>
           <boxGeometry args={[0.2, 2.8, 0.3]} />
-          <meshStandardMaterial color={color} roughness={0.5} />
+          <StyledMaterial color={color} roughness={0.5} />
         </mesh>
       ))}
       <mesh position={[0, 2.9, 0]}>
         <boxGeometry args={[2.16, 0.2, 0.3]} />
-        <meshStandardMaterial color={color} roughness={0.5} />
+        <StyledMaterial color={color} roughness={0.5} />
       </mesh>
     </group>
   )
@@ -219,7 +220,7 @@ export function Door3D({ block, locale, station, index, timing, nav, currentHref
       {/* mat in front of the hall */}
       <mesh position={[0, 0.01, 1.2]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[width, 1.6]} />
-        <meshStandardMaterial color={theme.world.platform} />
+        <StyledMaterial color={theme.world.platform} />
       </mesh>
     </group>
   )

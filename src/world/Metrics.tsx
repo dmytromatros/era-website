@@ -17,6 +17,8 @@ export const metrics = {
   /** Geometries / textures alive on the GPU. */
   geometries: 0,
   textures: 0,
+  /** Compiled shader programs (a jump = something compiled shaders during play). */
+  programs: 0,
   level: 'high' as string,
 }
 
@@ -46,6 +48,7 @@ export function Metrics() {
     metrics.triangles = render.triangles
     metrics.geometries = memory.geometries
     metrics.textures = memory.textures
+    metrics.programs = gl.info.programs?.length ?? 0
     if (delta > 0) metrics.fps = metrics.fps ? metrics.fps * 0.9 + (1 / delta) * 0.1 : 1 / delta
     gl.info.reset()
   }, 2)

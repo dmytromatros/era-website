@@ -3,9 +3,11 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { Theme } from '@/theme/tokens'
-import { useTheme } from '@/theme/store'
+import { useTheme, useThemeStore } from '@/theme/store'
 import type { Box } from './layout'
 import type { Mat, Office as OfficeData, Prim } from './officeModel'
+import { useStylePreset } from './style'
+import { applyToon } from './toonMaterial'
 
 const BOX = new THREE.BoxGeometry(1, 1, 1)
 const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 16)
@@ -69,7 +71,17 @@ function Instanced({
  * lights, windows, and the ceiling plane.
  */
 export function Office({ data, accent }: { data: OfficeData; accent?: string }) {
-  const theme = useTheme()
+  const baseTheme = useTheme()
+  const preset = useStylePreset()
+  const themeName = useThemeStore((s) => s.name)
+  // The style's office palette (light theme only — the dark theme is still a draft).
+  const theme = useMemo<Theme>(
+    () =>
+      preset.palette && themeName === 'light'
+        ? { ...baseTheme, world: { ...baseTheme.world, office: { ...baseTheme.world.office, ...preset.palette } } }
+        : baseTheme,
+    [baseTheme, preset, themeName],
+  )
   const o = theme.world.office
 
   const groups = useMemo(
@@ -101,6 +113,11 @@ export function Office({ data, accent }: { data: OfficeData; accent?: string }) 
     materials.window.color.set(o.window)
     materials.ceiling.color.set(o.ceiling)
   }, [materials, o])
+  // Cartoon light response for the opaque office surfaces (wow-plan A2; glass stays as is).
+  useLayoutEffect(() => {
+    applyToon(materials.solid, preset)
+    applyToon(materials.ceiling, preset, 'ceiling')
+  }, [materials, preset])
   useLayoutEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials])
 
   const colorBox = useMemo(() => (i: number) => matColor(theme, groups.box[i]!.mat, accent), [theme, groups, accent])

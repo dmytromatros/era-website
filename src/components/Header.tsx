@@ -7,6 +7,7 @@ import { portalTo } from '@/experience/portal'
 import { useExperience } from '@/experience/store'
 import { localizeHref } from '@/lib/href'
 import { ThemeSwitch } from '@/theme/ThemeSwitch'
+import { StyleSwitch } from '@/world/StyleSwitch'
 import styles from './Header.module.css'
 
 interface Props {
@@ -49,6 +50,7 @@ export function Header({ siteName, locale, nav }: Props) {
       </nav>
       <div className={styles.tools}>
         <ModeSwitch />
+        <StyleSwitch />
         <ThemeSwitch />
       </div>
     </header>
