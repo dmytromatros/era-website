@@ -12,7 +12,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
 import { live, selectReady, useExperience } from '@/experience/store'
 import { useThemeStore } from '@/theme/store'
-import { MAX_STEP, landingIsStill, notePark, pace, pacer, wake } from './framePacing'
+import { MAX_STEP, MEMBRANE_LAYER, landingIsStill, notePark, pace, pacer, wake, wakeByPointer } from './framePacing'
+import { noteWaveInput, waves, wavesBusy } from './membraneWaves'
 import { useQuality } from './quality'
 import { useStyle } from './style'
 import { useXRay } from './xrayState'
@@ -37,6 +38,11 @@ export function FramePacer() {
       if (!r.draw) return
       clock += Math.min((now - last) / 1000, MAX_STEP)
       last = now
+      // Waves on a still landing: the film alone (it is opaque there; the office behind it is
+      // not drawn at all). Layer 0 = everything, as always.
+      const camera = get().camera
+      if (pacer.membraneOnly) camera.layers.set(MEMBRANE_LAYER)
+      else camera.layers.set(0)
       get().advance(clock)
     }
     raf = requestAnimationFrame(tick)
@@ -51,10 +57,18 @@ export function FramePacer() {
     ]
     const events = ['scroll', 'resize', 'visibilitychange'] as const
     for (const e of events) window.addEventListener(e, wake, { passive: true })
+    // The pointer stirs the film (D1): on the landing it wakes the loop for the film only.
+    const onPointer = () => {
+      if (!waves.enabled || useExperience.getState().handedOver) return
+      noteWaveInput(performance.now())
+      wakeByPointer()
+    }
+    window.addEventListener('pointermove', onPointer, { passive: true })
     return () => {
       cancelAnimationFrame(raf)
       unsubs.forEach((u) => u())
       for (const e of events) window.removeEventListener(e, wake)
+      window.removeEventListener('pointermove', onPointer)
       wake()
     }
   }, [get])
@@ -70,7 +84,8 @@ export function FramePacer() {
       ready: selectReady(st),
       portalBusy: st.portal.phase !== 'idle' || st.arrival !== null,
     })
-    notePark(still, performance.now())
+    const now = performance.now()
+    notePark(still, now, wavesBusy(now))
   })
 
   return null

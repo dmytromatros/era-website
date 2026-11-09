@@ -38,6 +38,8 @@ export interface Theme {
     sunIntensity: number
     shadow: string
     shadowOpacity: number
+    /** The visitor's own hands (D1, world/firstPerson): neutral sleeves, Dima 2026-11-09. */
+    hero: { skin: string; sleeve: string; cuff: string }
     /** The office the route runs through (see world/office.ts). */
     office: {
       ceiling: string
@@ -94,6 +96,7 @@ const light: Theme = {
     sunIntensity: 1.4,
     shadow: '#000000',
     shadowOpacity: 0.16,
+    hero: { skin: '#eab792', sleeve: '#cfcbc3', cuff: '#f2efe9' },
     office: {
       ceiling: '#fbfbf9',
       light: '#ffffff',
@@ -150,6 +153,7 @@ const dark: Theme = {
     sunIntensity: 1.1,
     shadow: '#000000',
     shadowOpacity: 0.45,
+    hero: { skin: '#c9977a', sleeve: '#3c3f46', cuff: '#5b5f68' },
     office: {
       ceiling: '#15171b',
       light: '#fff3d6',

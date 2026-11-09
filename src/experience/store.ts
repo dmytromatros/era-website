@@ -148,6 +148,11 @@ export const live = {
   pointer: { x: 0, y: 0 },
   /** Pointer in UV space (0..1, origin bottom-left) — the ripple centre. */
   pointerUv: { x: 0.5, y: 0.5 },
+  /**
+   * Where the visitor tears in (uv, origin bottom-left; D1): set at the handover from the pointer
+   * (centre on a touch screen). The tear starts here and the hands press here.
+   */
+  tear: { x: 0.5, y: 0.5 },
   /** Last scroll position per page (scene key) — so Back returns to the same spot in 3D. */
   positions: {} as Record<string, number>,
 }

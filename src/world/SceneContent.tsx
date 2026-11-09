@@ -15,6 +15,7 @@ import { BODY } from '@/actors/rig'
 import { hitKey } from '@/actors/hits'
 import { buildExhibit, toWorld, type ExhibitModel } from './exhibitModel'
 import { Exhibit } from './Exhibit'
+import { Hands } from './firstPerson/Hands'
 import { HeroTransit, type TransitItem } from './HeroTransit'
 import type { KineticOptions } from './KineticText'
 import { ENTRANCE_GEOMETRY, layoutRoute, type ExhibitSize } from './layout'
@@ -148,6 +149,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
   return (
     <>
       <CameraRig layout={world.layout} timing={timing} sceneKey={scene.key} />
+      {/* After the camera rig: the visitor's hands follow the camera placed this frame (D1). */}
+      <Hands />
       {arrivedHere && world.layout.stations[0] && (
         <ArrivalDoor viewpoint={world.layout.stations[0].viewpoint} focus={world.layout.stations[0].focus} />
       )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FRAME_MS, landingIsStill, notePark, pace, pacer, PARK_AFTER_MS, wake } from './framePacing'
+import { FRAME_MS, landingIsStill, notePark, pace, pacer, PARK_AFTER_MS, wake, wakeByPointer } from './framePacing'
 
 /** Drawn frames per second when vsync comes at `hz` (with a little timestamp jitter). */
 function fpsAt(hz: number, seconds = 5): number {
@@ -78,5 +78,32 @@ describe('frame pacer', () => {
     notePark(false, 10_000) // anything moving resets the wait
     notePark(true, 10_100)
     expect(pacer.parked).toBe(false)
+  })
+
+  it('the pointer wakes a parked landing to draw the film only; anything else, the whole world', () => {
+    const park = () => {
+      wake()
+      for (let t = 0; !pacer.parked; t += 100) notePark(true, t)
+    }
+    park()
+    wakeByPointer()
+    expect(pacer.parked).toBe(false)
+    expect(pacer.membraneOnly).toBe(true)
+    wake() // scroll, resize, theme…
+    expect(pacer.membraneOnly).toBe(false)
+    // Not parked (still warming up the GPU): the pointer changes nothing.
+    wakeByPointer()
+    expect(pacer.membraneOnly).toBe(false)
+  })
+
+  it('with waves still moving, a warmed-up landing draws the film only, then parks', () => {
+    wake()
+    let t = 0
+    for (; t < PARK_AFTER_MS + 200; t += 16) notePark(true, t, true)
+    expect(pacer.parked).toBe(false)
+    expect(pacer.membraneOnly).toBe(true)
+    notePark(true, t, false) // the waves died out
+    expect(pacer.parked).toBe(true)
+    wake()
   })
 })

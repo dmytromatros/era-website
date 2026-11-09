@@ -57,27 +57,58 @@ export interface ParkInput {
 export const landingIsStill = (p: ParkInput) =>
   !p.handedOver && p.scrollPx <= 2 && p.progress === 0 && p.ready && !p.portalBusy
 
+/**
+ * Layer the film is on besides the default one (D1). While the pointer stirs the waves on an
+ * otherwise still landing, the camera sees only this layer: the film is opaque there, the
+ * office behind it (~126 draw calls) could not be seen anyway.
+ */
+export const MEMBRANE_LAYER = 1
+
 /** Shared between the loop and the wake-up listeners. */
 export const pacer = {
   parked: false,
   /** Still frames in a row, and since when (performance.now(), ms). */
   still: 0,
   stillSince: 0,
+  /**
+   * Woken from a park by the pointer alone (waves on the film): draw only the film
+   * (MEMBRANE_LAYER). Anything else that wakes the loop draws the whole world again.
+   */
+  membraneOnly: false,
 }
 
-/** One drawn frame: is the landing still, and should the loop park now? */
-export function notePark(still: boolean, now: number) {
+/**
+ * One drawn frame: is the landing still, and should the loop park now? `waving` = waves still
+ * move on the film (D1): once the landing is warmed up the loop then draws the film alone
+ * instead of parking, and parks when they have died out.
+ */
+export function notePark(still: boolean, now: number, waving = false) {
   if (!still) {
     pacer.still = 0
     return
   }
   if (pacer.still === 0) pacer.stillSince = now
   pacer.still++
-  if (pacer.still >= PARK_MIN_FRAMES && now - pacer.stillSince >= PARK_AFTER_MS) pacer.parked = true
+  if (pacer.still >= PARK_MIN_FRAMES && now - pacer.stillSince >= PARK_AFTER_MS) {
+    if (waving) pacer.membraneOnly = true
+    else pacer.parked = true
+  }
 }
 
 /** Something changed: draw again (and re-check stillness from scratch). */
 export function wake() {
   pacer.parked = false
   pacer.still = 0
+  pacer.membraneOnly = false
+}
+
+/**
+ * The pointer moved (waves on the film, D1). From a park: draw again, the film only — every
+ * other program and texture is already on the GPU (it parked). Not parked: nothing to change.
+ */
+export function wakeByPointer() {
+  if (!pacer.parked) return
+  pacer.parked = false
+  pacer.still = 0
+  pacer.membraneOnly = true
 }
