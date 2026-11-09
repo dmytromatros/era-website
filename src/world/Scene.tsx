@@ -5,6 +5,7 @@ import { ENTRANCE_GEOMETRY } from './layout'
 import { useExperience } from '@/experience/store'
 import { Atmosphere } from './Atmosphere'
 import { Driver } from './Driver'
+import { FramePacer } from './FramePacer'
 import { Effects } from './effects/Effects'
 import { DebugStats } from './DebugStats'
 import { Floor } from './Floor'
@@ -35,9 +36,12 @@ export function Scene() {
         // Events come from the whole page, so the DOM can sit above the canvas.
         eventSource={document.body}
         eventPrefix="client"
+        // Frames are drawn by <FramePacer>: at most 60 a second, none on a still 2D landing.
+        frameloop="never"
       >
         {/* First: smooths scroll and decides the handover before anything else updates. */}
         <Driver />
+        <FramePacer />
         <Atmosphere />
         <Floor />
         {scene && <SceneContent key={scene.key} scene={scene} />}

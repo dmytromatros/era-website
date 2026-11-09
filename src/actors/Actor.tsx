@@ -9,7 +9,7 @@ import { useExperience } from '@/experience/store'
 import { QUALITY, useQuality } from '@/world/quality'
 import { StyledMaterial } from '@/world/toonMaterial'
 import { accessories } from './accessories'
-import { activities, greet, HOLDING_RATE, type PoseContext, type PropProps } from './activities'
+import { activities, ActorOnScreen, greet, HOLDING_RATE, type PoseContext, type PropProps } from './activities'
 import type { ActivityName, ReactionName } from './catalog'
 import { EmojiPop, type EmojiShow } from './EmojiPop'
 import { lowerBend, solveTwoBone, upperBasis, type V3 } from './ik'
@@ -168,6 +168,29 @@ const _y = new THREE.Vector3()
 const _z = new THREE.Vector3()
 const _w = new THREE.Vector3()
 
+/**
+ * Is a character (bounding sphere, world space) in the camera's view this frame? The frustum is
+ * built once per frame for all characters. Off-screen characters skip their whole frame — pose,
+ * IK, springs and props (CLAUDE.md section 0: nothing computed that nobody sees).
+ */
+const _frustum = new THREE.Frustum()
+const _pv = new THREE.Matrix4()
+const _sphere = new THREE.Sphere()
+let frustumAt = -1
+function onScreen(group: THREE.Object3D, camera: THREE.Camera, frameTime: number, radius: number): boolean {
+  if (frameTime !== frustumAt) {
+    frustumAt = frameTime
+    camera.updateMatrixWorld()
+    _frustum.setFromProjectionMatrix(_pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+  }
+  group.getWorldPosition(_sphere.center)
+  _sphere.center.y += BODY.height * 0.5 * group.scale.y
+  _sphere.radius = radius * group.scale.y
+  return _frustum.intersectsSphere(_sphere)
+}
+/** Reaches props and raised arms too (the chart board stands a metre to the side). */
+const VIEW_RADIUS = 2.4
+
 /** Angle change wrapped to (−π, π]: a full spin that resets to 0 is not a jolt. */
 const turnBy = (now: number, before: number) => Math.atan2(Math.sin(now - before), Math.cos(now - before))
 
@@ -304,6 +327,8 @@ export function Actor({ def, activity, attentive, talking, target }: Props) {
     prev: { head: new THREE.Euler(), torso: new THREE.Euler(), y: 0, ready: false },
   })
   const emoji = useMemo<EmojiShow>(() => ({ emoji: null, start: 0 }), [])
+  const body = useRef<THREE.Group>(null)
+  const onScreenRef = useRef(true)
   const camLocal = useMemo(() => new THREE.Vector3(), [])
 
   // A held click cursor must not stay on after the character unmounts.
@@ -316,6 +341,15 @@ export function Actor({ def, activity, attentive, talking, target }: Props) {
   )
 
   useFrame(({ clock, camera, pointer }, delta) => {
+    // Off-screen and not reacting: freeze (props too, via ActorOnScreen). A frame later, when it
+    // comes into view, everything continues from the clock — nothing to catch up.
+    const s0 = state.current
+    const shown = body.current ? s0.reaction !== null || onScreen(body.current, camera, clock.elapsedTime, VIEW_RADIUS) : true
+    onScreenRef.current = shown
+    if (!shown) {
+      s0.prev.ready = false // no velocity spike for the springs on the way back
+      return
+    }
     const j = resolveJoints({
       root,
       torso,
@@ -538,6 +572,7 @@ export function Actor({ def, activity, attentive, talking, target }: Props) {
 
   return (
     <group
+      ref={body}
       scale={def.scale}
       // Clicks and the hover cursor work only once the 3D world has taken over (rule 18).
       onClick={(e: ThreeEvent<MouseEvent>) => {
@@ -602,7 +637,7 @@ export function Actor({ def, activity, attentive, talking, target }: Props) {
           </group>
         </group>
 
-        {Prop && <Prop palette={palette} />}
+        <ActorOnScreen.Provider value={onScreenRef}>{Prop && <Prop palette={palette} />}</ActorOnScreen.Provider>
       </group>
       {/* Beside the head: above it are the speech bubble (HTML, on top of everything) or a held heading. */}
       <EmojiPop show={emoji} x={0.6 * side} y={BODY.height - 0.35} first={def.reactions[0]!.emoji} />

@@ -8,7 +8,7 @@
  */
 import { RoundedBox } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useRef, type ComponentType } from 'react'
+import { createContext, useContext, useRef, type ComponentType } from 'react'
 import type * as THREE from 'three'
 import type { ActorDef } from '@/content/schema'
 import type { ActivityName } from './catalog'
@@ -17,6 +17,9 @@ import { StyledMaterial } from '@/world/toonMaterial'
 
 /** Rate of the `holding` strain; a held kinetic heading sways in time with it (KineticText). */
 export const HOLDING_RATE = 2.4
+
+/** Whether the character holding a prop is on screen this frame (its props pause when not). */
+export const ActorOnScreen = createContext<{ current: boolean }>({ current: true })
 
 export interface PropProps {
   palette: ActorDef['palette']
@@ -123,9 +126,10 @@ function PaintPalette({ palette }: PropProps) {
 
 function FloatingCube({ palette }: PropProps) {
   const ref = useRef<THREE.Mesh>(null)
+  const shown = useContext(ActorOnScreen)
   useFrame(({ clock }) => {
     const m = ref.current
-    if (!m) return
+    if (!m || !shown.current) return
     const t = clock.elapsedTime
     m.rotation.set(t * 0.7, t * 1.1, 0)
     m.position.y = 1.5 + Math.sin(t * 1.6) * 0.06
@@ -141,7 +145,9 @@ function FloatingCube({ palette }: PropProps) {
 function JuggleBalls({ palette }: PropProps) {
   const group = useRef<THREE.Group>(null)
   const colors = [palette.accent, palette.shirt, '#ffffff']
+  const shown = useContext(ActorOnScreen)
   useFrame(({ clock }) => {
+    if (!shown.current) return
     const t = clock.elapsedTime * 3.2
     group.current?.children.forEach((ball, i) => {
       const a = t + (i * Math.PI * 2) / 3
@@ -162,7 +168,9 @@ function JuggleBalls({ palette }: PropProps) {
 
 function ChartBoard({ palette }: PropProps) {
   const bars = useRef<THREE.Group>(null)
+  const shown = useContext(ActorOnScreen)
   useFrame(({ clock }) => {
+    if (!shown.current) return
     bars.current?.children.forEach((bar, i) => {
       const h = 0.45 + 0.35 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 1.2 + i * 1.3)) * (i + 1) * 0.5
       bar.scale.y = h

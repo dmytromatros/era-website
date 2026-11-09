@@ -1,7 +1,7 @@
 'use client'
 
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuality } from './quality'
 
 /**
@@ -42,14 +42,21 @@ export function Metrics() {
     metrics.level = level
   }, [level])
 
-  useFrame((_, delta) => {
+  // FPS from the real time between drawn frames — not the scene clock's delta, which is capped
+  // per step (FramePacer) and would flatter a slow device.
+  const lastFrame = useRef(0)
+  useFrame(() => {
+    const now = performance.now()
+    const gap = lastFrame.current ? (now - lastFrame.current) / 1000 : 0
+    lastFrame.current = now
     const { render, memory } = gl.info
     metrics.calls = render.calls
     metrics.triangles = render.triangles
     metrics.geometries = memory.geometries
     metrics.textures = memory.textures
     metrics.programs = gl.info.programs?.length ?? 0
-    if (delta > 0) metrics.fps = metrics.fps ? metrics.fps * 0.9 + (1 / delta) * 0.1 : 1 / delta
+    // A park (still landing) or a background tab is not a slow frame: skip such gaps.
+    if (gap > 0 && gap < 1) metrics.fps = metrics.fps ? metrics.fps * 0.9 + (1 / gap) * 0.1 : 1 / gap
     gl.info.reset()
   }, 2)
 
