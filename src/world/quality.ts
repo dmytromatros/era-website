@@ -32,6 +32,11 @@ export interface QualitySettings {
    * the camera only, no extra draw calls (the emoji is one plane while it is in the air).
    */
   actorLife: boolean
+  /**
+   * Physics steps a second (C2: balls, boxes; in a worker). The motion is interpolated between
+   * steps, so 30 still looks smooth — half the work on weak devices.
+   */
+  physicsHz: number
   /** Background blur (B3): samples per pixel, 0 = off (no pass at all). */
   depthBlur: number
   /** Live view through the portal doors (B2): texture size as a fraction of the screen (0 = off)… */
@@ -42,9 +47,9 @@ export interface QualitySettings {
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10 },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0 },
-  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, depthBlur: 16, portalScale: 1, portalMaxFps: 0 },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, physicsHz: 30, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10 },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0 },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 16, portalScale: 1, portalMaxFps: 0 },
 }
 
 const STORAGE_KEY = 'era-quality'

@@ -194,6 +194,8 @@ export const actorSchema = z.object({
   reactions: z.array(reactionSchema).min(1).default([{ move: 'jump', emoji: '👋' }]),
   /** Played instead when the visitor keeps clicking. */
   annoyed: reactionSchema.default({ move: 'shrug', emoji: '😤' }),
+  /** Played when a pushed ball or box hits the character (C2). */
+  hit: reactionSchema.default({ move: 'surprised', emoji: '😲' }),
 })
 
 export type ActorDef = z.infer<typeof actorSchema> & { id: string }

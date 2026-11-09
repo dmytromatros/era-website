@@ -12,6 +12,7 @@ import { accessories } from './accessories'
 import { activities, ActorOnScreen, greet, HOLDING_RATE, type PoseContext, type PropProps } from './activities'
 import type { ActivityName, ReactionName } from './catalog'
 import { EmojiPop, type EmojiShow } from './EmojiPop'
+import { onActorHit } from './hits'
 import { lowerBend, solveTwoBone, upperBasis, type V3 } from './ik'
 import {
   clickMemory,
@@ -43,6 +44,8 @@ interface Props {
   /** Mouth moves while the speech bubble is typing. */
   talking: boolean
   target?: ActorTarget
+  /** Hits by props arrive under this key (hits.ts). */
+  hitKey?: string
 }
 
 type Palette = ActorDef['palette']
@@ -283,7 +286,7 @@ interface ReactionPlay {
  * blink/talk → accessories on springs. The springy extras run only while the visitor is near (or
  * a reaction plays); far characters just do their job and shift their weight.
  */
-export function Actor({ def, activity, attentive, talking, target }: Props) {
+export function Actor({ def, activity, attentive, talking, target, hitKey }: Props) {
   const root = useRef<THREE.Group>(null)
   const torso = useRef<THREE.Group>(null)
   const head = useRef<THREE.Group>(null)
@@ -322,6 +325,7 @@ export function Actor({ def, activity, attentive, talking, target }: Props) {
     pointerMovedAt: -Infinity,
     clicks: clickMemory(),
     clicked: false,
+    wasHit: false,
     reaction: null as ReactionPlay | null,
     /** Previous frame, for velocities of the accessory mounts. */
     prev: { head: new THREE.Euler(), torso: new THREE.Euler(), y: 0, ready: false },
@@ -330,6 +334,9 @@ export function Actor({ def, activity, attentive, talking, target }: Props) {
   const body = useRef<THREE.Group>(null)
   const onScreenRef = useRef(true)
   const camLocal = useMemo(() => new THREE.Vector3(), [])
+
+  // A prop hit it (physics thread): play the hit reaction on the next frame.
+  useEffect(() => (hitKey ? onActorHit(hitKey, () => (state.current.wasHit = true)) : undefined), [hitKey])
 
   // A held click cursor must not stay on after the character unmounts.
   const hovered = useRef(false)
@@ -390,11 +397,13 @@ export function Actor({ def, activity, attentive, talking, target }: Props) {
     j.root.rotation.z += tilt
     j.torso.rotation.z -= tilt * 0.8
 
-    // Click → next reaction of the cycle (or "annoyed") and its emoji.
-    if (s.clicked) {
+    // Click → next reaction of the cycle (or "annoyed") and its emoji; a prop hit → `hit`.
+    if (s.clicked || s.wasHit) {
+      const r = s.wasHit
+        ? def.hit
+        : ((pick) => (pick === 'annoyed' ? def.annoyed : def.reactions[pick]!))(pickReaction(s.clicks, def.reactions.length, now))
       s.clicked = false
-      const pick = pickReaction(s.clicks, def.reactions.length, now)
-      const r = pick === 'annoyed' ? def.annoyed : def.reactions[pick]!
+      s.wasHit = false
       s.reaction = { name: r.move, start: now }
       emoji.emoji = r.emoji
       emoji.start = now

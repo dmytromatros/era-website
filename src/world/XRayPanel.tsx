@@ -3,10 +3,19 @@
 import { useEffect, useState } from 'react'
 import { useExperience } from '@/experience/store'
 import { metrics } from './Metrics'
+import { physicsStats } from './physics/Physics'
 import { useXRay, xrayStats } from './xrayState'
 import styles from './XRayPanel.module.css'
 
 const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
+
+/** Physics (C2) in a worker: idle until something can move, so "0 moving" is the usual answer. */
+function physicsLine(): string {
+  const p = physicsStats
+  if (p.state === 'off') return 'not loaded (no props near)'
+  if (p.state === 'loading') return 'loading in a worker…'
+  return p.awake ? `${p.awake} of ${p.bodies} moving · ${p.ms.toFixed(1)} ms in worker` : `${p.bodies} bodies · all asleep, worker idle`
+}
 
 /**
  * The X-ray mode's live numbers (B4): what a frame costs right now (Metrics.tsx) and what
@@ -30,6 +39,7 @@ export function XRayPanel() {
         ['geo · tex', `${m.geometries} · ${m.textures}`],
         ['quality', m.level],
         ['instanced', `${s.instancedMeshes} calls → ${k(s.instances)} objects`],
+        ['physics', physicsLine()],
       ])
     }
     read()
@@ -44,7 +54,7 @@ export function XRayPanel() {
       <p className={styles.legend}>One colour = one draw call</p>
       <dl className={styles.rows}>
         {rows.map(([label, value]) => (
-          <div key={label} className={label === 'instanced' ? `${styles.row} ${styles.wide}` : styles.row}>
+          <div key={label} className={label === 'instanced' || label === 'physics' ? `${styles.row} ${styles.wide}` : styles.row}>
             <dt>{label}</dt>
             <dd>{value}</dd>
           </div>

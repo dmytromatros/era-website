@@ -36,6 +36,14 @@ export interface Prim {
   size: Vec3
   yaw: number
   mat: Mat
+  /** Part of a swivel chair seat: the floor point of its stem (C2: it spins around it). */
+  pivot?: Vec3
+}
+
+/** A swivel chair whose seat and back spin around the stem (C2). Prims in world space. */
+export interface Chair {
+  pivot: Vec3
+  prims: Prim[]
 }
 
 export interface Office {
@@ -50,6 +58,10 @@ export interface Office {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number }
   /** Footprints of placed furniture and columns (for tests and future collision / WASD). */
   footprints: { x: number; z: number; r: number; kind: 'furniture' | 'column' }[]
+  /** Floor that must stay free: the route's clear floor plus the ground under mezzanines. */
+  keepOff: ClearRect[]
+  /** Swivel chairs (their seats are not in `solid`). */
+  chairs: Chair[]
 }
 
 export const OFFICE = {
@@ -89,11 +101,8 @@ export function blocked(x: number, z: number, r: number, clear: ClearRect[]): bo
 function place(local: Prim[], at: Vec3, yaw: number): Prim[] {
   const c = Math.cos(yaw)
   const s = Math.sin(yaw)
-  return local.map((p) => ({
-    ...p,
-    center: [at[0] + p.center[0] * c + p.center[2] * s, at[1] + p.center[1], at[2] - p.center[0] * s + p.center[2] * c],
-    yaw: p.yaw + yaw,
-  }))
+  const move = (v: Vec3): Vec3 => [at[0] + v[0] * c + v[2] * s, at[1] + v[1], at[2] - v[0] * s + v[2] * c]
+  return local.map((p) => ({ ...p, center: move(p.center), yaw: p.yaw + yaw, ...(p.pivot ? { pivot: move(p.pivot) } : {}) }))
 }
 
 const box = (center: Vec3, size: Vec3, mat: Mat, yaw = 0): Prim => ({ shape: 'box', center, size, yaw, mat })
@@ -110,9 +119,9 @@ function desk(x: number, z: number, facing: 1 | -1): Prim[] {
     box([x + 0.66, 0.36, z], [0.04, 0.72, 0.66], 'metal'),
     box([x, 1.0, z - f * 0.22], [0.56, 0.34, 0.03], 'screen'),
     box([x, 0.82, z - f * 0.24], [0.05, 0.14, 0.05], 'metal'),
-    // chair
-    box([x, 0.46, z + f * 0.62], [0.48, 0.08, 0.46], 'fabricA'),
-    box([x, 0.78, z + f * 0.84], [0.48, 0.52, 0.06], 'fabricA'),
+    // chair: seat and back swivel on the stem (C2)
+    { ...box([x, 0.46, z + f * 0.62], [0.48, 0.08, 0.46], 'fabricA'), pivot: [x, 0, z + f * 0.62] },
+    { ...box([x, 0.78, z + f * 0.84], [0.48, 0.52, 0.06], 'fabricA'), pivot: [x, 0, z + f * 0.62] },
     cyl([x, 0.21, z + f * 0.62], 0.08, 0.42, 'metal'),
   ]
 }
@@ -325,8 +334,18 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
   side([maxX, 0, maxZ], [minX, 0, maxZ])
   side([minX, 0, maxZ], [minX, 0, minZ])
 
+  // Swivel chair seats leave `solid`: they spin on their own (Office.tsx).
+  const chairsByPivot = new Map<string, Chair>()
+  for (const p of solid) {
+    if (!p.pivot) continue
+    const key = p.pivot.map((v) => v.toFixed(3)).join()
+    const chair = chairsByPivot.get(key) ?? { pivot: p.pivot, prims: [] }
+    chair.prims.push(p)
+    chairsByPivot.set(key, chair)
+  }
+
   return {
-    solid,
+    solid: solid.filter((p) => !p.pivot),
     glass,
     frosted,
     lights,
@@ -337,5 +356,7 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
       ...placed.map((p) => ({ ...p, kind: 'furniture' as const })),
       ...columns.map((c) => ({ ...c, kind: 'column' as const })),
     ],
+    keepOff,
+    chairs: [...chairsByPivot.values()],
   }
 }

@@ -1,12 +1,14 @@
 'use client'
 
-import { useFrame } from '@react-three/fiber'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useExperience } from '@/experience/store'
 import * as THREE from 'three'
 import type { Theme } from '@/theme/tokens'
 import { useTheme, useThemeStore } from '@/theme/store'
 import type { Box } from './layout'
-import type { Mat, Office as OfficeData, Prim } from './officeModel'
+import type { Chair, Mat, Office as OfficeData, Prim } from './officeModel'
+import { kickSpin, spin, stepSpin, type Spin } from './physics/chairSpin'
 import { useQualitySettings } from './quality'
 import { createScreenMaterial } from './screenMaterial'
 import { useStylePreset } from './style'
@@ -66,6 +68,104 @@ function Instanced({
   if (!items.length) return null
   // `key` on count: an InstancedMesh cannot grow, so a different count needs a new one.
   return <instancedMesh key={items.length} ref={ref} args={[geometry, material, items.length]} frustumCulled={false} />
+}
+
+/**
+ * Swivel chair seats (C2): one instanced mesh for all of them; a click spins a seat around its
+ * stem (chairSpin.ts). Only spinning chairs are updated — a still office costs nothing.
+ */
+function Chairs({
+  chairs,
+  material,
+  colorOf,
+  interactive,
+}: {
+  chairs: Chair[]
+  material: THREE.Material
+  colorOf: (p: Prim) => string
+  interactive: boolean
+}) {
+  const ref = useRef<THREE.InstancedMesh>(null)
+  const items = useMemo(() => chairs.flatMap((c, ci) => c.prims.map((p) => ({ p, ci }))), [chairs])
+  const first = useMemo(() => {
+    const out: number[] = []
+    let n = 0
+    for (const c of chairs) {
+      out.push(n)
+      n += c.prims.length
+    }
+    return out
+  }, [chairs])
+  const spins = useRef(new Map<number, Spin>())
+
+  const place = (mesh: THREE.InstancedMesh, ci: number, angle: number) => {
+    const c = chairs[ci]!
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    c.prims.forEach((p, k) => {
+      // rotate the prim's offset from the stem by `angle` around y (three.js convention)
+      const dx = p.center[0] - c.pivot[0]
+      const dz = p.center[2] - c.pivot[2]
+      tmp.position.set(c.pivot[0] + dx * cos + dz * sin, p.center[1], c.pivot[2] - dx * sin + dz * cos)
+      tmp.rotation.set(0, p.yaw + angle, 0)
+      tmp.scale.set(...p.size)
+      tmp.updateMatrix()
+      mesh.setMatrixAt(first[ci]! + k, tmp.matrix)
+    })
+  }
+
+  useLayoutEffect(() => {
+    const mesh = ref.current
+    if (!mesh) return
+    chairs.forEach((_, ci) => place(mesh, ci, 0))
+    items.forEach(({ p }, i) => mesh.setColorAt(i, color.set(colorOf(p))))
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    mesh.computeBoundingSphere()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `place` only reads `chairs` / `first`
+  }, [chairs, items, first, colorOf])
+
+  useFrame((_, delta) => {
+    const mesh = ref.current
+    if (!mesh || !spins.current.size) return
+    for (const [ci, s] of spins.current) {
+      const moving = stepSpin(s, delta)
+      place(mesh, ci, s.angle)
+      if (!moving) spins.current.delete(ci)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  })
+
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
+    if (!interactive || !useExperience.getState().handedOver || e.instanceId === undefined) return
+    e.stopPropagation()
+    const ci = items[e.instanceId]!.ci
+    const c = chairs[ci]!
+    // Which way it turns: the side of the stem that was hit, seen along the click.
+    const ox = e.point.x - c.pivot[0]
+    const oz = e.point.z - c.pivot[2]
+    const dx = e.point.x - e.camera.position.x
+    const dz = e.point.z - e.camera.position.z
+    const torque = (ox * dz - oz * dx) / (Math.hypot(dx, dz) || 1)
+    const s = spins.current.get(ci) ?? spin()
+    kickSpin(s, Math.max(-1, Math.min(1, torque / 0.3)))
+    spins.current.set(ci, s)
+  }
+
+  if (!items.length) return null
+  return (
+    <instancedMesh
+      key={items.length}
+      ref={ref}
+      args={[BOX, material, items.length]}
+      frustumCulled={false}
+      onClick={interactive ? onClick : undefined}
+      onPointerOver={
+        interactive ? () => useExperience.getState().handedOver && (document.body.style.cursor = 'pointer') : undefined
+      }
+      onPointerOut={interactive ? () => (document.body.style.cursor = '') : undefined}
+    />
+  )
 }
 
 /**
@@ -144,6 +244,7 @@ export function Office({
   const colorBall = useMemo(() => (i: number) => matColor(theme, groups.ball[i]!.mat, accent), [theme, groups, accent])
   const colorScreen = useMemo(() => (i: number) => matColor(theme, groups.screen[i]!.mat, accent), [theme, groups, accent])
   const colorFoliage = useMemo(() => (i: number) => matColor(theme, groups.foliage[i]!.mat, accent), [theme, groups, accent])
+  const colorChair = useMemo(() => (p: Prim) => matColor(theme, p.mat, accent), [theme, accent])
 
   // Living details move only on quality levels that allow it (on `low` they hold still).
   const { liveDetails } = useQualitySettings()
@@ -158,6 +259,8 @@ export function Office({
       <Instanced items={groups.ball} geometry={BALL} material={materials.solid} colorOf={colorBall} yawSign={1} />
       <Instanced items={groups.foliage} geometry={BALL} material={materials.plant} colorOf={colorFoliage} yawSign={1} />
       <Instanced items={groups.screen} geometry={BOX} material={materials.screen} colorOf={colorScreen} yawSign={1} />
+      {/* Swivel seats: they spin when clicked — only in the page's own office, not behind portal doors. */}
+      <Chairs chairs={data.chairs} material={materials.solid} colorOf={colorChair} interactive={tickTime} />
       <Instanced items={data.frosted} geometry={BOX} material={materials.frosted} yawSign={-1} />
       <Instanced items={data.glass} geometry={BOX} material={materials.glass} yawSign={-1} />
       <Instanced items={data.lights} geometry={BOX} material={materials.light} yawSign={-1} />

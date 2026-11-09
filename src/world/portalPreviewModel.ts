@@ -108,6 +108,8 @@ export function cullInFront(office: Office, t: PreviewTransform): Office {
     lights: boxes(office.lights),
     windows: boxes(office.windows),
     footprints: office.footprints.filter((f) => doorZ(t, f.x, f.z) + f.r < -MARGIN),
+    // A chair stays only if all of it (and its whole swing, ≈ 0.4 m round the stem) is behind.
+    chairs: office.chairs.filter((c) => c.prims.every(behind) && doorZ(t, c.pivot[0], c.pivot[2]) + 0.4 < -MARGIN),
   }
 }
 

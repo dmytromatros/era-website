@@ -69,6 +69,8 @@ describe('portal preview (B2)', () => {
       ceiling: { center: [0, 7, 0] as Vec3, size: [10, 10] as [number, number] },
       bounds: { minX: -5, maxX: 5, minZ: -5, maxZ: 5 },
       footprints: [],
+      keepOff: [],
+      chairs: [],
     }
     const kept = cullInFront(office, t)
     expect(kept.solid.map((p) => p.center[2])).toEqual([-3])

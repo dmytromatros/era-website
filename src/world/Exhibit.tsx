@@ -1,5 +1,6 @@
 'use client'
 
+import { hitKey } from '@/actors/hits'
 import type { ActorDef } from '@/content/schema'
 import { useTheme } from '@/theme/store'
 import { ElementView } from './ElementView'
@@ -62,7 +63,9 @@ export function Exhibit({ model, station, stopIndex, timing, zone, actors, k, sh
 
       {model.helpers.map((placed, i) => {
         const actor = actors[placed.helper.actor]
-        return actor ? <Helper key={i} placed={placed} actor={actor} stopIndex={stopIndex} timing={timing} /> : null
+        return actor ? (
+          <Helper key={i} placed={placed} actor={actor} stopIndex={stopIndex} timing={timing} hitKey={hitKey(stopIndex, i)} />
+        ) : null
       })}
     </group>
   )

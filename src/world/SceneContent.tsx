@@ -11,14 +11,19 @@ import type { SceneData } from '@/experience/store'
 import { useExperience } from '@/experience/store'
 import { CameraRig } from './CameraRig'
 import { Decor } from './Decor'
-import { buildExhibit, type ExhibitModel } from './exhibitModel'
+import { BODY } from '@/actors/rig'
+import { hitKey } from '@/actors/hits'
+import { buildExhibit, toWorld, type ExhibitModel } from './exhibitModel'
 import { Exhibit } from './Exhibit'
 import { HeroTransit, type TransitItem } from './HeroTransit'
 import type { KineticOptions } from './KineticText'
 import { ENTRANCE_GEOMETRY, layoutRoute, type ExhibitSize } from './layout'
 import { ArrivalDoor } from './ArrivalDoor'
 import { Membrane } from './Membrane'
-import { buildOffice } from './officeModel'
+import { buildOffice, OFFICE } from './officeModel'
+import { Physics } from './physics/Physics'
+import type { ActorCollider } from './physics/protocol'
+import { placeProps, propBodies, staticShapes, type StaticShape, type StopExhibit } from './physics/propsModel'
 import { Office } from './Office'
 import { officeStyle } from './officeStyle'
 import { planTiming, routePlan } from './route'
@@ -87,8 +92,56 @@ export function SceneContent({ scene }: { scene: SceneData }) {
         kinetic: spec.id === KINETIC_ELEMENT ? kinetic : undefined,
       }))
     })
-    return { models, layout, transit, office: buildOffice(layout, style.seed) }
-  }, [measured, plan, timing, page, k, size, nav, currentHref, style.seed])
+    const office = buildOffice(layout, style.seed)
+
+    // ---- props you can push (C2): beside the exhibits, plus the static world they hit ----
+    const exhibits: StopExhibit[] = models.map((m, i) => {
+      const st = layout.stations[i]!
+      return {
+        width: m?.width ?? 0,
+        elevation: m?.elevation ?? 0,
+        helpers: m ? m.helpers.map((h) => toWorld(h.local, st.anchor, st.yaw)) : [],
+      }
+    })
+    const skip = plan.stops.flatMap((stop, i) => (i === 0 || page.blocks[stop.blockIndex]!.type === 'door' ? [i] : []))
+    const spots = placeProps(layout, office, exhibits, style.seed, skip, size.width / size.height)
+    const bodies = propBodies(spots, style.seed)
+    const exhibitShapes: StaticShape[] = models.flatMap((m, i) => {
+      if (!m) return []
+      const { anchor, yaw } = layout.stations[i]!
+      const slabs = m.elements
+        .filter((e) => e.spec.box)
+        .map((e): StaticShape => ({
+          shape: 'box',
+          pos: toWorld(e.local, anchor, yaw),
+          half: [(e.spec.width * k) / 2, (e.spec.height * k) / 2, 0.04],
+          yaw,
+        }))
+      const legs = (m.stand ?? []).map(
+        (x): StaticShape => ({ shape: 'box', pos: toWorld([x, m.elevation / 2, -0.06], anchor, yaw), half: [0.03, m.elevation / 2, 0.03], yaw }),
+      )
+      return [...slabs, ...legs]
+    })
+    const actorColliders: ActorCollider[] = []
+    const actorKeys: string[] = []
+    models.forEach((m, i) => {
+      m?.helpers.forEach((h, hi) => {
+        const st = layout.stations[i]!
+        const scale = actors[h.helper.actor]?.scale ?? 1
+        actorColliders.push({ at: toWorld(h.local, st.anchor, st.yaw), radius: 0.32 * scale, height: BODY.height * scale })
+        actorKeys.push(hitKey(i, hi))
+      })
+    })
+    const physics = {
+      bodies,
+      statics: staticShapes(office, spots, exhibitShapes),
+      actors: actorColliders,
+      actorKeys,
+      // Rapier loads about two rail points before the first stop with a prop.
+      wakeRail: spots.length ? Math.min(...spots.map((sp) => timing.stopRail[sp.station]!)) - 2.5 : Infinity,
+    }
+    return { models, layout, transit, office, physics }
+  }, [measured, plan, timing, page, k, size, nav, currentHref, style.seed, actors])
 
   if (!world) return <Membrane />
 
@@ -103,6 +156,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       {/* Floating shapes are off inside the office (perPoint 0); raise it to bring them back. */}
       <Decor rail={world.layout.rail} clearance={world.layout.corridorHalfWidth} perPoint={0} />
       <HeroTransit items={world.transit} k={k} viewport={size} sceneKey={scene.key} />
+      {/* Re-mounted when the layout changes (resize): a fresh physics world for the new layout. */}
+      <Physics key={`${size.width}x${size.height}`} {...world.physics} timing={timing} ceilingY={OFFICE.ceilingY} />
       {plan.stops.map((stop, i) => {
         const station = world.layout.stations[i]!
         const model = world.models[i]

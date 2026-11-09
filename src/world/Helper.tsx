@@ -26,10 +26,12 @@ interface Props {
   actor: ActorDef
   stopIndex: number
   timing: Timing
+  /** Key under which prop hits reach this character (C2). */
+  hitKey: string
 }
 
 /** A character working next to an element; talks when the camera stops at its exhibit. */
-export function Helper({ placed, actor, stopIndex, timing }: Props) {
+export function Helper({ placed, actor, stopIndex, timing, hitKey }: Props) {
   const theme = useTheme()
   const [attentive, setAttentive] = useState(false)
   const [talking, setTalking] = useState(false)
@@ -56,7 +58,7 @@ export function Helper({ placed, actor, stopIndex, timing }: Props) {
         <circleGeometry args={[0.45, 32]} />
         <meshBasicMaterial color={theme.world.shadow} transparent opacity={theme.world.shadowOpacity} />
       </mesh>
-      <Actor def={actor} activity={helper.pose} attentive={attentive} talking={talking} target={placed.target} />
+      <Actor def={actor} activity={helper.pose} attentive={attentive} talking={talking} target={placed.target} hitKey={hitKey} />
       {attentive && docked && (
         // Pinned to the overlay's top-left corner; the CSS docks it to the bottom of the screen.
         <Html calculatePosition={() => [0, 0]} portal={htmlPortal} zIndexRange={[20, 11]}>
