@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ACCESSORIES, ACTIVITIES } from '@/actors/catalog'
+import { ACCESSORIES, ACTIVITIES, REACTIONS } from '@/actors/catalog'
 import { WIDGETS } from '@/blocks/widgets/catalog'
 
 /* ------------------------------------------------------------------ */
@@ -172,6 +172,12 @@ export type Page = z.infer<typeof pageSchema>
 /* Actors (characters living inside the site)                          */
 /* ------------------------------------------------------------------ */
 
+const reactionSchema = z.object({
+  move: z.enum(REACTIONS),
+  /** One emoji (a few code points: skin tones and joined emoji are fine). */
+  emoji: z.string().min(1).max(16),
+})
+
 export const actorSchema = z.object({
   name: z.string().min(1),
   role: z.string().min(1),
@@ -184,6 +190,10 @@ export const actorSchema = z.object({
   }),
   accessories: z.array(z.enum(ACCESSORIES)).default([]),
   scale: z.number().positive().default(1),
+  /** Click / tap reactions, played in turn. */
+  reactions: z.array(reactionSchema).min(1).default([{ move: 'jump', emoji: '👋' }]),
+  /** Played instead when the visitor keeps clicking. */
+  annoyed: reactionSchema.default({ move: 'shrug', emoji: '😤' }),
 })
 
 export type ActorDef = z.infer<typeof actorSchema> & { id: string }

@@ -15,6 +15,8 @@ const BASE_ELEVATION = 0.75
 const HOLD_HEIGHT = BODY.height + 0.12
 /** Room a side helper takes next to the elements. */
 const SIDE_ROOM = 1.6
+/** Palms under a held element stay this much in front of it (from the camera they touch it). */
+const HOLD_HANDS_FRONT = 0.12
 
 export interface PlacedElement {
   spec: ElementSpec
@@ -29,6 +31,11 @@ export interface PlacedHelper {
   bubble: 'right' | 'above'
   /** Height of the bubble's anchor point above the floor. */
   bubbleY: number
+  /**
+   * Its element, relative to the character's feet (C1): hands reach for it by IK — the palms of
+   * a `holding` character press under `bottom`, a `pointing` one points at `centre`.
+   */
+  target: { centre: Vec3; bottom: Vec3 }
 }
 
 export interface ExhibitModel {
@@ -81,19 +88,22 @@ export function buildExhibit(specs: ElementSpec[], ids: string[], helpers: Helpe
 
   let sideIndex = 0
   const placed = mine.map((helper): PlacedHelper => {
-    const t = members.find((s) => s.id === helper.target)!
+    const t = elements.find((e) => e.spec.id === helper.target)!
+    const [cx, cy, cz] = t.local
+    // Relative to the feet (both are shifted alike below, so this stays true).
+    const target = (local: Vec3) => ({
+      centre: [cx - local[0], cy - local[1], cz - local[2]] as Vec3,
+      bottom: [cx - local[0], cy - (t.spec.height * k) / 2 - local[1], cz + HOLD_HANDS_FRONT - local[2]] as Vec3,
+    })
     if (helper.pose === 'holding') {
-      return { helper, local: [(t.x + t.width / 2 - midX) * k, 0, 0.3], bubble: 'right', bubbleY: 1.35 }
+      const local: Vec3 = [cx, 0, 0.3]
+      return { helper, local, bubble: 'right', bubbleY: 1.35, target: target(local) }
     }
     // Others stand beside the group: first on the left, then on the right.
     const left = sideIndex++ % 2 === 0
-    return {
-      helper,
-      // Far enough out that raised arms and props do not cover the element.
-      local: [(left ? -1 : 1) * (width / 2 + SIDE_ROOM * 0.55), 0, 0.35],
-      bubble: 'above',
-      bubbleY: BODY.height + 0.3,
-    }
+    // Far enough out that raised arms and props do not cover the element.
+    const local: Vec3 = [(left ? -1 : 1) * (width / 2 + SIDE_ROOM * 0.55), 0, 0.35]
+    return { helper, local, bubble: 'above', bubbleY: BODY.height + 0.3, target: target(local) }
   })
 
   // Centre everything (elements + characters) on the origin, so the camera frames the whole group.

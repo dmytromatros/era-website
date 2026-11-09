@@ -1,5 +1,8 @@
 name: Leo
 role: Client partner
 palette: { skin: "#e0ac85", shirt: "#ffb703", pants: "#023047", accent: "#219ebc", hair: "#2d1b10" }
-accessories: []
-
+accessories: [badge]
+# Click / tap: played in turn; `annoyed` after a few quick clicks (default: shrug 😤).
+reactions:
+  - { move: dance, emoji: "🤝" }
+  - { move: jump, emoji: "🎉" }

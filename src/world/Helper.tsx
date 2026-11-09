@@ -56,7 +56,7 @@ export function Helper({ placed, actor, stopIndex, timing }: Props) {
         <circleGeometry args={[0.45, 32]} />
         <meshBasicMaterial color={theme.world.shadow} transparent opacity={theme.world.shadowOpacity} />
       </mesh>
-      <Actor def={actor} activity={helper.pose} attentive={attentive} talking={talking} />
+      <Actor def={actor} activity={helper.pose} attentive={attentive} talking={talking} target={placed.target} />
       {attentive && docked && (
         // Pinned to the overlay's top-left corner; the CSS docks it to the bottom of the screen.
         <Html calculatePosition={() => [0, 0]} portal={htmlPortal} zIndexRange={[20, 11]}>

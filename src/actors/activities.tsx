@@ -22,9 +22,20 @@ export interface PropProps {
   palette: ActorDef['palette']
 }
 
+/** Where the activity happens relative to the character (from the exhibit layout). */
+export interface PoseContext {
+  /** Side of the element the character works on: +1 = its +x (armR side), −1 = its −x. */
+  side: 1 | -1
+}
+
 export interface Activity {
   /** Sets joint rotations for time `t` (seconds). Joints start from the rest pose each frame. */
-  animate: (j: Joints, t: number) => void
+  animate: (j: Joints, t: number, ctx: PoseContext) => void
+  /**
+   * Hands placed by IK on the element (C1), after `animate`: `hold` = both palms under it,
+   * `point` = the arm on the element's side points at its centre.
+   */
+  reach?: 'hold' | 'point'
   /** Rendered in actor space (feet at the origin, facing +z). */
   Prop?: ComponentType<PropProps>
   /** Rendered in the right / left hand. */
@@ -258,27 +269,39 @@ export const activities: Record<ActivityName, Activity> = {
     },
   },
 
-  /** Holds the element above its head so it does not fall (element is lifted to fit). */
+  /**
+   * Holds the element above its head so it does not fall (element is lifted to fit). The palms
+   * are pressed under it by IK; the arms are a bit too short for that, so they stretch a little
+   * and the shoulders shrug — straining, cartoon style.
+   */
   holding: {
     animate: (j, t) => {
       const strain = Math.sin(t * HOLDING_RATE) * 0.05
+      // Fallback pose (IK overrides the arms when the element is known).
       j.armL.rotation.set(-0.15, 0, -2.78 + strain)
       j.armR.rotation.set(-0.15, 0, 2.78 - strain)
+      j.armL.position.y += 0.05 + strain * 0.2
+      j.armR.position.y += 0.05 - strain * 0.2
       j.head.rotation.x = -0.32 + Math.sin(t * 0.9) * 0.05
       j.torso.rotation.z = Math.sin(t * 1.2) * 0.03
-      j.root.position.y = -Math.abs(Math.sin(t * 1.2)) * 0.02
+      // Knees give a little under the weight (the feet stay planted by IK).
+      j.root.position.y = -0.015 - Math.abs(Math.sin(t * 1.2)) * 0.02
     },
+    reach: 'hold',
   },
 
-  /** Points at the element to its right. */
+  /** Points at the element beside it (either side). */
   pointing: {
-    animate: (j, t) => {
+    animate: (j, t, { side }) => {
       breathe(j, t)
-      j.torso.rotation.y = 0.25
-      j.head.rotation.y = 0.5 + Math.sin(t * 0.6) * 0.2
-      j.armR.rotation.set(-0.35 + Math.sin(t * 2.2) * 0.08, 0, 1.35)
-      j.armL.rotation.set(0.05, 0, -0.1)
+      const [arm, other] = side > 0 ? [j.armR, j.armL] : [j.armL, j.armR]
+      j.torso.rotation.y = 0.25 * side
+      j.head.rotation.y = (0.5 + Math.sin(t * 0.6) * 0.2) * side
+      // Fallback pose (IK aims the arm when the element is known).
+      arm.rotation.set(-0.35 + Math.sin(t * 2.2) * 0.08, 0, 1.35 * side)
+      other.rotation.set(0.05, 0, -0.1 * side)
     },
+    reach: 'point',
   },
 }
 
@@ -289,4 +312,7 @@ export function greet(j: Joints, t: number, weight: number) {
   j.armR.rotation.x = lerp(j.armR.rotation.x, 0)
   j.armR.rotation.y = lerp(j.armR.rotation.y, 0)
   j.armR.rotation.z = lerp(j.armR.rotation.z, 2.55 + Math.sin(t * 9) * 0.35)
+  // The hand waves from the elbow.
+  j.foreR.rotation.x = lerp(j.foreR.rotation.x, 0)
+  j.foreR.rotation.z = lerp(j.foreR.rotation.z, Math.sin(t * 9 + 0.6) * 0.35)
 }

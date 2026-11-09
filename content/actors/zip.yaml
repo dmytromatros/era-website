@@ -2,4 +2,7 @@ name: Zip
 role: Creative developer
 palette: { skin: "#a8724f", shirt: "#9b5de5", pants: "#22223b", accent: "#f15bb5", hair: "#101010" }
 accessories: [antenna]
-
+# Click / tap: played in turn; `annoyed` after a few quick clicks (default: shrug 😤).
+reactions:
+  - { move: spin, emoji: "🤖" }
+  - { move: surprised, emoji: "⚡" }

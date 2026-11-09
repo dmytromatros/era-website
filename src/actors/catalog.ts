@@ -21,5 +21,12 @@ export const ACTIVITIES = [
 ] as const
 export type ActivityName = (typeof ACTIVITIES)[number]
 
-export const ACCESSORIES = ['headphones', 'cap', 'glasses', 'beret', 'antenna'] as const
+export const ACCESSORIES = ['headphones', 'cap', 'glasses', 'beret', 'antenna', 'badge'] as const
 export type AccessoryName = (typeof ACCESSORIES)[number]
+
+/**
+ * What a character does when clicked (C1): a short move on top of its activity, plus an emoji.
+ * Implemented in `src/actors/reactions.ts` (same three steps as above to add one).
+ */
+export const REACTIONS = ['jump', 'spin', 'surprised', 'dance', 'shrug'] as const
+export type ReactionName = (typeof REACTIONS)[number]

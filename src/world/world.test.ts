@@ -59,6 +59,33 @@ describe('buildExhibit', () => {
     expect(helperX - 0.6 + m.width / 2).toBeCloseTo(0) // left extent == -width/2
   })
 
+  it('tells each character where its element is, relative to its feet (C1 IK targets)', () => {
+    const held = buildExhibit(specs, ['heading'], [{ target: 'heading', actor: 'a', pose: 'holding', lines: ['x'] }], k)
+    const [heading] = held.elements
+    const holder = held.helpers[0]!
+    // Palms go right under the heading, a little in front of it.
+    expect(holder.target.bottom[0]).toBeCloseTo(0)
+    expect(holder.local[1] + holder.target.bottom[1]).toBeCloseTo(heading!.local[1] - (100 * k) / 2)
+    expect(holder.local[2] + holder.target.bottom[2]).toBeGreaterThan(heading!.local[2])
+
+    // Two side helpers: the left one's element is on its +x side, the right one's on its −x side.
+    const two = buildExhibit(
+      specs,
+      ['heading', 'lead'],
+      [
+        { target: 'lead', actor: 'a', pose: 'pointing', lines: ['x'] },
+        { target: 'heading', actor: 'b', pose: 'pointing', lines: ['x'] },
+      ],
+      k,
+    )
+    const [left, right] = two.helpers
+    expect(left!.target.centre[0]).toBeGreaterThan(0)
+    expect(right!.target.centre[0]).toBeLessThan(0)
+    const lead = two.elements.find((e) => e.spec.id === 'lead')!
+    expect(left!.local[0] + left!.target.centre[0]).toBeCloseTo(lead.local[0])
+    expect(left!.local[1] + left!.target.centre[1]).toBeCloseTo(lead.local[1])
+  })
+
   it('keeps 2D arrangement inside the group', () => {
     const m = buildExhibit(specs, ['heading', 'lead'], [], k)
     const [h, l] = m.elements
