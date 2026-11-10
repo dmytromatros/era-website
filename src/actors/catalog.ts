@@ -18,10 +18,11 @@ export const ACTIVITIES = [
   'waving',
   'holding',
   'pointing',
+  'carrying',
 ] as const
 export type ActivityName = (typeof ACTIVITIES)[number]
 
-export const ACCESSORIES = ['headphones', 'cap', 'glasses', 'beret', 'antenna', 'badge'] as const
+export const ACCESSORIES = ['headphones', 'cap', 'glasses', 'beret', 'antenna', 'badge', 'ponytail'] as const
 export type AccessoryName = (typeof ACCESSORIES)[number]
 
 /**

@@ -72,3 +72,41 @@
     transform: scale(0.6);
   }
 }
+
+/* The coffee welcome's answers (D3). The overlay lets the pointer through; only these catch it,
+   so scrolling over the bubble still scrolls the page. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.button {
+  pointer-events: auto;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.primary {
+  background: var(--ui-accent);
+  color: var(--ui-accent-text);
+  border-color: transparent;
+}

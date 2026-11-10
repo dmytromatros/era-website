@@ -6,3 +6,21 @@ nav:
     - { label: Home, href: / }
     - { label: Who we are, href: /who-we-are }
     - { label: Contacts, href: /contacts }
+# Right after the visitor falls into the 3D world from the 2D landing, a character walks up and
+# offers a coffee (wow-plan D3). Once per page view; never on arriving through a portal or Back.
+welcome:
+  en:
+    actor: mila
+    lines:
+      - "Whoa — you came right through the page! Are you okay?"
+      - "First day? Here, have a coffee."
+    take: "Take it ☕"
+    decline: "No, thanks"
+    thanks: "Welcome to DFRNC!"
+    shrug: "Suit yourself 🙂"
+# The entrance cutscene (fall → look at the hands → coffee): when it is over, a hint that the
+# scroll is the visitor's again (mouse / touch screens).
+cutscene:
+  en:
+    hint: "Scroll to continue"
+    hintTouch: "Swipe to continue"

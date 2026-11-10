@@ -90,3 +90,20 @@
     font-size: 13px;
   }
 }
+
+/* The entrance cutscene's black bars run under the header: the logo goes light on them. */
+.logo,
+.mark {
+  transition:
+    color 0.4s,
+    background-color 0.4s;
+}
+
+:global(html[data-cutscene]) .logo {
+  color: #fff;
+}
+
+:global(html[data-cutscene]) .mark {
+  background: #fff;
+  color: #000;
+}

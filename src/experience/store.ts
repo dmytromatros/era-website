@@ -1,7 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
-import type { ActorDef, Page } from '@/content/schema'
+import type { ActorDef, CutsceneTexts, Page, Welcome } from '@/content/schema'
 import type { PageElements } from './measure'
 
 /** What the current route hands to the persistent 3D canvas. Plain data, no JSX. */
@@ -18,6 +18,10 @@ export interface SceneData {
    * live view of the page behind them (B2). Optional: older scene objects may lack it.
    */
   previews?: Record<string, Page>
+  /** The coffee welcome of this locale with its character (D3); absent = none. */
+  welcome?: Welcome & { def: ActorDef }
+  /** The entrance cutscene's end hint (texts of this locale). */
+  cutscene?: CutsceneTexts
 }
 
 /**

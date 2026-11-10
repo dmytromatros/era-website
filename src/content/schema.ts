@@ -204,12 +204,37 @@ export type ActorDef = z.infer<typeof actorSchema> & { id: string }
 /* Site                                                                */
 /* ------------------------------------------------------------------ */
 
+/** The coffee welcome (wow-plan D3): who walks up, what they say, the two buttons. */
+export const welcomeSchema = z.object({
+  /** Id of a file in content/actors/. */
+  actor: z.string().min(1),
+  lines: z.array(z.string().min(1)).min(1).max(3),
+  take: z.string().min(1).max(24),
+  decline: z.string().min(1).max(24),
+  /** Said after taking the coffee / after a no (or scrolling on). */
+  thanks: z.string().min(1),
+  shrug: z.string().min(1),
+})
+
+export type Welcome = z.infer<typeof welcomeSchema>
+
+export const cutsceneSchema = z.object({
+  hint: z.string().min(1).max(40),
+  hintTouch: z.string().min(1).max(40),
+})
+
+export type CutsceneTexts = z.infer<typeof cutsceneSchema>
+
 export const siteSchema = z.object({
   name: z.string().min(1),
   defaultLocale: z.string().min(2),
   locales: z.array(z.string().min(2)).min(1),
   /** Navigation per locale. `href` is locale-less, `/` is the home page. */
   nav: z.record(z.string(), z.array(z.object({ label: z.string().min(1), href }))),
+  /** Per locale; absent = no coffee welcome. */
+  welcome: z.record(z.string(), welcomeSchema).optional(),
+  /** Per locale: the hint shown when the entrance cutscene gives the scroll back. */
+  cutscene: z.record(z.string(), cutsceneSchema).optional(),
 })
 
 export type Site = z.infer<typeof siteSchema>

@@ -9,9 +9,10 @@ import { useExperience } from '@/experience/store'
 import { QUALITY, useQuality } from '@/world/quality'
 import { StyledMaterial } from '@/world/toonMaterial'
 import { accessories } from './accessories'
-import { activities, ActorOnScreen, greet, HOLDING_RATE, type PoseContext, type PropProps } from './activities'
+import { activities, ActorDriveContext, ActorOnScreen, greet, HOLDING_RATE, type PoseContext, type PropProps } from './activities'
 import type { ActivityName, ReactionName } from './catalog'
 import { EmojiPop, type EmojiShow } from './EmojiPop'
+import { gaitAt } from './gait'
 import { onActorHit } from './hits'
 import { lowerBend, solveTwoBone, upperBasis, type V3 } from './ik'
 import {
@@ -36,6 +37,22 @@ export interface ActorTarget {
   bottom: V3
 }
 
+/**
+ * Driven from outside, frame by frame (D3: a character who walks and hands over a coffee). One
+ * object per character, mutated by its scene; the actor reads it every frame.
+ */
+export interface ActorDrive {
+  /** Distance walked (world units) and how much it is walking (0..1): steps from the distance. */
+  walked: number
+  moving: number
+  /** How far it holds out what is in its right hand, 0..1 (the `carrying` activity). */
+  offer: number
+  /** Whether it still carries it. */
+  carrying: boolean
+  /** A reaction to play now (taken on the next frame). */
+  cue: { move: ReactionName; emoji: string } | null
+}
+
 interface Props {
   def: ActorDef
   activity: ActivityName
@@ -46,6 +63,7 @@ interface Props {
   target?: ActorTarget
   /** Hits by props arrive under this key (hits.ts). */
   hitKey?: string
+  drive?: ActorDrive
 }
 
 type Palette = ActorDef['palette']
@@ -286,7 +304,7 @@ interface ReactionPlay {
  * blink/talk → accessories on springs. The springy extras run only while the visitor is near (or
  * a reaction plays); far characters just do their job and shift their weight.
  */
-export function Actor({ def, activity, attentive, talking, target, hitKey }: Props) {
+export function Actor({ def, activity, attentive, talking, target, hitKey, drive }: Props) {
   const root = useRef<THREE.Group>(null)
   const torso = useRef<THREE.Group>(null)
   const head = useRef<THREE.Group>(null)
@@ -307,7 +325,7 @@ export function Actor({ def, activity, attentive, talking, target, hitKey }: Pro
   const act = activities[activity]
   const phase = useMemo(() => phaseOf(def.id), [def.id])
   const side: 1 | -1 = target && target.centre[0] < 0 ? -1 : 1
-  const ctx = useMemo<PoseContext>(() => ({ side }), [side])
+  const ctx = useMemo<PoseContext>(() => ({ side, drive }), [side, drive])
 
   // Accessories swing around their pivots: one wrapper group (and spring) each.
   const worn = useMemo(
@@ -389,7 +407,20 @@ export function Actor({ def, activity, attentive, talking, target, hitKey }: Pro
     // no steps. A click reaction takes over from it.
     const handsUp = act.reach === 'hold'
     const standing = stance(t, !handsUp, FOOT_X)
-    const sway = (handsUp ? 0.5 : 1) * standing.weight
+    // Walking (D3): soles from the distance walked, arms and hips swing; blended in and out.
+    const walking = drive ? drive.moving : 0
+    if (walking > 0.001) {
+      const g = gaitAt(drive!.walked / def.scale, FOOT_X)
+      standing.feet = standing.feet.map((f, i) => {
+        const w = g.feet[i]!
+        return [f[0] + (w[0] - f[0]) * walking, f[1] + (w[1] - f[1]) * walking, f[2] + (w[2] - f[2]) * walking] as [number, number, number]
+      }) as typeof standing.feet
+      j.root.position.y += g.bob * walking
+      j.armL.rotation.x -= g.swing * walking
+      if (activity !== 'carrying') j.armR.rotation.x += g.swing * walking
+      j.torso.rotation.y += g.twist * walking
+    }
+    const sway = (handsUp ? 0.5 : 1) * standing.weight * (1 - walking)
     const tilt = sway * STANCE.hipTilt
     // The root turns around the floor point between the feet, which would swing the hips back
     // the other way (hipY · sin tilt): add that back, so the hips really go over the standing leg.
@@ -397,6 +428,13 @@ export function Actor({ def, activity, attentive, talking, target, hitKey }: Pro
     j.root.rotation.z += tilt
     j.torso.rotation.z -= tilt * 0.8
 
+    // A reaction cued by the scene (D3: a smile, a shrug).
+    if (drive?.cue) {
+      s.reaction = { name: drive.cue.move, start: now }
+      emoji.emoji = drive.cue.emoji
+      emoji.start = now
+      drive.cue = null
+    }
     // Click → next reaction of the cycle (or "annoyed") and its emoji; a prop hit → `hit`.
     if (s.clicked || s.wasHit) {
       const r = s.wasHit
@@ -601,6 +639,7 @@ export function Actor({ def, activity, attentive, talking, target, hitKey }: Pro
         document.body.style.cursor = ''
       }}
     >
+      <ActorDriveContext.Provider value={drive}>
       <group ref={root}>
         <Leg ref={legL} shin={shinL} foot={footL} x={-FOOT_X} palette={palette} />
         <Leg ref={legR} shin={shinR} foot={footR} x={FOOT_X} palette={palette} />
@@ -648,6 +687,7 @@ export function Actor({ def, activity, attentive, talking, target, hitKey }: Pro
 
         <ActorOnScreen.Provider value={onScreenRef}>{Prop && <Prop palette={palette} />}</ActorOnScreen.Provider>
       </group>
+      </ActorDriveContext.Provider>
       {/* Beside the head: above it are the speech bubble (HTML, on top of everything) or a held heading. */}
       <EmojiPop show={emoji} x={0.6 * side} y={BODY.height - 0.35} first={def.reactions[0]!.emoji} />
     </group>

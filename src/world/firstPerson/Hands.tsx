@@ -11,7 +11,9 @@ import { useStylePreset } from '../style'
 import { applyToon } from '../toonMaterial'
 import { cameraBody, crackFrame } from './crack'
 import { useQualitySettings } from '../quality'
-import { forearmOf, sleeveOf, handsAt, walkHandsAt, type HandPose, type Wrist } from './handsModel'
+import { coffeeHand, coffeeMemory } from '../coffee/coffeeModel'
+import { cupParts } from '../coffee/Cup'
+import { cupInHand, forearmOf, sleeveOf, handsAt, takeHandAt, walkHandsAt, type HandPose, type Wrist } from './handsModel'
 import { walkNow } from './walkModel'
 import { live } from '@/experience/store'
 
@@ -84,6 +86,9 @@ export function Hands() {
   const size = useThree((s) => s.size)
   const { walkHands } = useQualitySettings()
   const group = useRef<THREE.Group>(null)
+  const cupMesh = useRef<THREE.Mesh>(null)
+  const steamMesh = useRef<THREE.Mesh>(null)
+  const cup = useMemo(() => cupParts(), [])
   const left = useRef<THREE.Mesh>(null)
   const right = useRef<THREE.Mesh>(null)
 
@@ -125,14 +130,33 @@ export function Hands() {
     // Arrived mid-page (no crack to play): no entrance hands.
     let visible = pose.visible && since !== Infinity
     let walking = false
-    // Otherwise, walking (D2): they swing with the steps, peeking in at the bottom of the frame.
-    if (!visible && walkHands && walkNow.walk.moving > 0.02) {
-      pose = walkHandsAt(walkNow.walk, view)
+    let taking = false
+    if (!visible && coffeeHand.take > 0.001) {
+      // Taking the coffee (D3): the right hand reaches up for the cup the character holds out.
+      pose = { ...pose, right: takeHandAt(coffeeHand.take, coffeeHand.toward, view) }
+      visible = taking = walking = true
+    } else if (!visible && walkHands && walkNow.walk.moving > 0.02) {
+      // Otherwise, walking (D2): they swing with the steps, peeking in at the bottom of the frame
+      // — the right one steady with the coffee, if the visitor took it.
+      pose = walkHandsAt(walkNow.walk, view, coffeeMemory.has)
       visible = pose.visible
       walking = true
     }
     g.visible = visible
     if (!visible) return
+    if (left.current) left.current.visible = !taking
+    // The coffee in the right hand, upright, steaming.
+    const cupShown = walking && coffeeMemory.has
+    if (cupMesh.current && steamMesh.current) {
+      cupMesh.current.visible = steamMesh.current.visible = cupShown
+      if (cupShown) {
+        const at = cupInHand(pose.right)
+        cupMesh.current.position.set(...at)
+        // (scaled steam: lift it back onto the cup's rim)
+        steamMesh.current.position.set(at[0], at[1] + 0.065, at[2])
+        cupParts().steamMaterial.uniforms.uTime!.value = clock.elapsedTime
+      }
+    }
     // Hang on the body: the camera on its rail without the crack's kick (CameraRig wrote it
     // this frame — it is mounted before us), so a nod or a glance brings the hands into view.
     g.matrix.copy(cameraBody)
@@ -147,6 +171,10 @@ export function Hands() {
     <group ref={group} matrixAutoUpdate={false} visible={false}>
       <mesh ref={left} geometry={geometry.left} material={material} raycast={noRaycast} />
       <mesh ref={right} geometry={geometry.right} material={material} raycast={noRaycast} />
+      {/* The coffee (D3): drawn with the hands' own material — no new program. */}
+      <mesh ref={cupMesh} geometry={cup.geometry} material={material} visible={false} raycast={noRaycast} />
+      {/* This close to the eye, full-size steam would fill the view: a thin wisp. */}
+      <mesh ref={steamMesh} geometry={cup.steam} material={cup.steamMaterial} visible={false} scale={[0.6, 0.45, 0.6]} raycast={noRaycast} />
     </group>
   )
 }

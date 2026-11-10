@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { listPageSlugs, readActorsFor, readPage, readSite } from '@/content'
+import { listPageSlugs, readActor, readActorsFor, readPage, readSite } from '@/content'
 import { PageView } from '@/experience/PageView'
 
 export const dynamicParams = false
@@ -26,7 +26,9 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/[[...slu
 
 export default async function Page({ params }: PageProps<'/[locale]/[[...slug]]'>) {
   const { locale, slug, page } = await load(params)
-  const nav = readSite().nav[locale] ?? []
+  const site = readSite()
+  const nav = site.nav[locale] ?? []
+  const welcome = site.welcome?.[locale]
   const here = `/${slug.join('/')}`
   // The other pages' content, for the live views in the portal doors (B2).
   const previews = Object.fromEntries(
@@ -45,6 +47,8 @@ export default async function Page({ params }: PageProps<'/[locale]/[[...slug]]'
         actors: readActorsFor(page),
         nav,
         previews,
+        welcome: welcome ? { ...welcome, def: readActor(welcome.actor) } : undefined,
+        cutscene: site.cutscene?.[locale],
       }}
     />
   )

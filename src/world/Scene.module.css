@@ -11,3 +11,149 @@
   overflow: hidden;
   pointer-events: none;
 }
+
+/* The entrance cutscene (world/cutscene): cinema bars while the scene plays (html[data-cutscene],
+   set by the scroll lock), then a hint that the scroll is the visitor's again
+   (html[data-cutscene-hint], until they scroll). CSS only: no frames, no draw calls. */
+.frame {
+  --bar: 9vh;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--bar);
+  background: #000;
+  transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+}
+
+.barTop {
+  top: 0;
+  transform: translateY(-100%);
+}
+
+.barBottom {
+  bottom: 0;
+  transform: translateY(100%);
+}
+
+:global(html[data-cutscene]) .bar {
+  transform: none;
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-surface) 82%, transparent);
+  color: var(--ui-text);
+  font: 700 12px/1 var(--font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, 14px);
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s ease;
+}
+
+:global(html[data-cutscene-hint]) .hint {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-delay: 0.35s; /* after the bars are gone */
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* A mouse with its wheel rolling (pointer devices) … */
+.mouse {
+  position: relative;
+  width: 18px;
+  height: 28px;
+  border: 2px solid currentColor;
+  border-radius: 10px;
+}
+
+.mouse::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 3px;
+  height: 6px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: wheel 1.4s ease-in-out infinite;
+}
+
+/* … and a chevron bouncing down (both). */
+.chevron {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  animation: bounce 1.4s ease-in-out infinite;
+}
+
+.touchText {
+  display: none;
+}
+
+@media (hover: none) {
+  .mouse,
+  .mouseText {
+    display: none;
+  }
+  .touchText {
+    display: inline;
+  }
+}
+
+@media (max-width: 719px) {
+  /* The coffee's bubble docks at the bottom there: thin bars. */
+  .frame {
+    --bar: 5vh;
+  }
+}
+
+@keyframes wheel {
+  0% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(-2px) rotate(45deg);
+  }
+  50% {
+    transform: translateY(4px) rotate(45deg);
+  }
+}

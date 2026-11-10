@@ -42,15 +42,15 @@ try {
   const evaluate = async (expr) => (await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true })).result?.result?.value
 
   await send('Emulation.setDeviceMetricsOverride', { width: +W, height: +H, deviceScaleFactor: 1, mobile: +W < 768 })
-  // Rail points in scroll units (entrance = 2.236 with the D1 hold, src/world/timeline.ts ENTRANCE).
-  const points = [3.536, 11.136, 16.836, 19.436, 21.936]
+  // Rail points in scroll units (entrance = 1.6, src/world/timeline.ts ENTRANCE; the D1 hold is off).
+  const points = [2.9, 10.5, 16.2, 18.8, 21.3]
   const results = {}
   for (const q of ['high', 'medium', 'low']) {
     await send('Page.navigate', { url: `http://localhost:3000/en?debug=1&quality=${q}` })
     await sleep(9000)
     results[q] = {}
     for (const u of points) {
-      await evaluate(`(() => { const m = document.documentElement.scrollHeight - innerHeight; scrollTo(0, m * ${u} / 23.236) })()`)
+      await evaluate(`(() => { const m = document.documentElement.scrollHeight - innerHeight; scrollTo(0, m * ${u} / 22.6) })()`)
       await sleep(5000)
       results[q][u] = await evaluate(`(document.querySelector('[data-debug-stats]')?.textContent || 'none') + ' | handover=' + document.documentElement.hasAttribute('data-handover')`)
     }

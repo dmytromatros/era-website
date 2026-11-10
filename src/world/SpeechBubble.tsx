@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import styles from './Helper.module.css'
 
 const CHARS_PER_SECOND = 45
 
 /** Types the character's lines out letter by letter. Remount to restart. */
-export function SpeechBubble({ name, lines, onDone }: { name: string; lines: string[]; onDone: () => void }) {
+export function SpeechBubble({ name, lines, onDone, children }: { name: string; lines: string[]; onDone: () => void; children?: ReactNode }) {
   const total = lines.reduce((n, l) => n + l.length, 0)
   const [shown, setShown] = useState(0)
 
@@ -38,6 +38,7 @@ export function SpeechBubble({ name, lines, onDone }: { name: string; lines: str
           </p>
         )
       })}
+      {children}
     </div>
   )
 }

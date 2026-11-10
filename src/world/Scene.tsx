@@ -19,6 +19,27 @@ import { SceneContent } from './SceneContent'
 import styles from './Scene.module.css'
 
 /** The persistent 3D canvas. Mounted once per visit (lives in the locale layout). */
+/** Cinema bars and the "scroll to continue" hint of the entrance cutscene (CSS only, see the module). */
+function CutsceneFrame() {
+  const texts = useExperience((s) => s.scene?.cutscene)
+  return (
+    <div className={styles.frame}>
+      <div className={`${styles.bar} ${styles.barTop}`} />
+      <div className={`${styles.bar} ${styles.barBottom}`} />
+      {texts && (
+        <div className={styles.hint} role="status">
+          <span className={styles.row}>
+            <span className={styles.mouse} />
+            <span className={styles.mouseText}>{texts.hint}</span>
+            <span className={styles.touchText}>{texts.hintTouch}</span>
+          </span>
+          <span className={styles.chevron} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Scene() {
   const scene = useExperience((s) => s.scene)
   return (
@@ -54,6 +75,7 @@ export function Scene() {
         {/* X-ray mode: the world as a blueprint, one colour per draw call (B4). */}
         <XRay />
       </Canvas>
+      <CutsceneFrame />
       <div className={styles.overlay} ref={setHtmlPortal} />
       <DebugStats />
       <XRayPanel />

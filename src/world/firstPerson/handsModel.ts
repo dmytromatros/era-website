@@ -279,7 +279,7 @@ export interface Gait {
  * into the bottom of the frame as it swings forward — higher and harder at a run, down out of
  * the frame at a standstill, palms facing in. They never reach up to where the cards are.
  */
-export function walkHandsAt(g: Gait, view: View): HandsPose {
+export function walkHandsAt(g: Gait, view: View, carry = false): HandsPose {
   const k = Math.max(1, 1 / view.aspect) ** 0.75
   const z0 = -0.45 * k
   const halfWidth = Math.tan(((view.fov / 2) * Math.PI) / 180) * view.aspect * -z0
@@ -299,6 +299,11 @@ export function walkHandsAt(g: Gait, view: View): HandsPose {
     // hand down, out and back to the elbow — below and outside the frame, swinging with the arm —
     // instead of all the way to the shoulder. Straight wrist, fingers forward and a little in,
     // palms facing in, towards each other; the edge of the hand leads.
+    if (carry && side === 1) {
+      // Carrying a coffee (D3): the right hand stays steady in front, a little lower right.
+      const held: Vec3 = [x * 0.9, (-0.165 - 0.4 * (1 - g.moving)) * k, z0 - 0.05]
+      return turnPalm(place(held, qEuler(-1.0, 0, 0), [x + 0.2 * k, held[1] - 0.26 * k, held[2] + 0.36 * k], 'straight'), held, [-1, 0, 0], 'straight')
+    }
     const elbow: Vec3 = [side * (x + 0.2 * k), palm[1] - 0.26 * k, palm[2] + 0.36 * k + 0.05 * swing * amp]
     const placed = place(palm, qEuler(-1.05 - 0.3 * swing * amp, 0, 0), elbow, 'straight')
     return turnPalm(placed, palm, [-side, 0, 0], 'straight')
@@ -368,4 +373,23 @@ export function handsAt(e: number, tear: Uv, view: View, crack: Crack | null = n
     press: crack ? 0 : lean,
     palms: [palmOf(left), palmOf(right)],
   }
+}
+
+/**
+ * The right hand taking the coffee (D3): from below the frame up along the ray towards the cup
+ * the character holds out (`toward`, camera space, unit), at `k` = 1 right there, then back
+ * down (the scene runs k up and down). Only the right hand; body space like the others.
+ */
+export function takeHandAt(k: number, toward: Vec3, view: View): HandPose {
+  const d = 0.8 * Math.max(1, 1 / view.aspect) ** 0.5
+  const e = k * k * (3 - 2 * k)
+  const palm: Vec3 = [toward[0] * d, toward[1] * d - 0.45 * (1 - e), toward[2] * d]
+  const elbow: Vec3 = [palm[0] + 0.25, palm[1] - 0.28, palm[2] + 0.34]
+  return turnPalm(place(palm, qEuler(-1.0, 0, 0), elbow, 'straight'), palm, [-1, 0, 0], 'straight')
+}
+
+/** Where the visitor's cup sits in the right hand (body space, upright): just inside the palm. */
+export const cupInHand = (h: HandPose): Vec3 => {
+  const p = palmPoint(h)
+  return [p[0] - 0.04, p[1] - 0.035, p[2]]
 }

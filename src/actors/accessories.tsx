@@ -176,6 +176,27 @@ const SNUG: WobbleTuning = {
   limit: [0.12, 0.15, 0.12],
 }
 
+/** A ponytail at the back of the head (Mila, D3): bounces on every step. Hair colour, accent tie. */
+function Ponytail({ palette }: Props) {
+  const hair = palette.hair ?? DARK
+  return (
+    <group position={[0, 0.42, -0.25]}>
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[0.13, 0.08, 0.08]} />
+        <StyledMaterial color={palette.accent} />
+      </mesh>
+      <mesh position={[0, -0.17, -0.05]} rotation-x={0.25}>
+        <boxGeometry args={[0.15, 0.32, 0.12]} />
+        <StyledMaterial color={hair} />
+      </mesh>
+      <mesh position={[0, -0.36, -0.11]} rotation-x={0.4}>
+        <boxGeometry args={[0.1, 0.12, 0.09]} />
+        <StyledMaterial color={hair} />
+      </mesh>
+    </group>
+  )
+}
+
 export const accessories: Record<AccessoryName, AccessoryDef> = {
   headphones: { Component: Headphones, mount: 'head', pivot: [0, 0.25, 0], wobble: { ...SNUG, gain: [0.01, 0.015, 0.01], bounce: 0.1 } },
   cap: { Component: Cap, mount: 'head', pivot: [0, 0.5, -0.1], wobble: SNUG },
@@ -187,6 +208,22 @@ export const accessories: Record<AccessoryName, AccessoryDef> = {
     mount: 'head',
     pivot: [0.12, 0.5, 0],
     wobble: { gain: [0.09, 0, 0.09], turnSwing: 0.08, bounce: 1.1, stiffness: 70, damping: 3.2, limit: [0.6, 0, 0.6] },
+  },
+  // Hangs at the back of the head: swings back and sideways, bounces with each step, never into
+  // the head (positive x = the tip goes back).
+  ponytail: {
+    Component: Ponytail,
+    mount: 'head',
+    pivot: [0, 0.42, -0.25],
+    wobble: {
+      gain: [0.1, 0, 0.12],
+      turnSwing: 0.14,
+      bounce: 1.6,
+      stiffness: 55,
+      damping: 3.2,
+      limit: [0.8, 0, 0.6],
+      xRange: [-0.05, 0.9],
+    },
   },
   // Hangs on the chest: swings forward freely, never into the chest.
   badge: {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { listPageSlugs, readActorsFor, readPage, readSite } from './read'
+import { listPageSlugs, readActor, readActorsFor, readPage, readSite } from './read'
 import { referenceErrors } from '@/blocks/elements'
 import { pageSchema } from './schema'
 
@@ -47,6 +47,13 @@ describe('content folder', () => {
       }
     })
   }
+
+  it('the coffee welcome (D3) names an existing character, for known locales only', () => {
+    for (const [locale, welcome] of Object.entries(site.welcome ?? {})) {
+      expect(site.locales).toContain(locale)
+      expect(() => readActor(welcome.actor)).not.toThrow()
+    }
+  })
 
   it('rejects path traversal in slugs', () => {
     expect(readPage('en', ['..', 'site'])).toBeNull()

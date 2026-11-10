@@ -18,9 +18,19 @@ export const ENTRANCE_RUN = 1.6
  * progress is exactly as before (the seam and the crack are untouched), after `to` it runs at the
  * usual rate.
  */
-export const HOLD = { from: 0.16, to: 0.2, units: 0.7 } as const
+export const HOLD = { from: 0.16, to: 0.16, units: 0 } as const
+// Off since 2026-11-10 (units 0, to = from): the entrance is now a cutscene that holds the page
+// itself (world/cutscene). The mechanism stays; give it units again to bring the pause back.
 /** Scroll units of the whole entrance. */
 export const ENTRANCE = HOLD.from * ENTRANCE_RUN + HOLD.units + (1 - HOLD.to) * ENTRANCE_RUN
+
+/** Scroll units at entrance progress `e` (the inverse of entranceAt; in the hold, its start). */
+export function entranceUnits(e: number): number {
+  const a = HOLD.from * ENTRANCE_RUN
+  if (e <= HOLD.from) return e * ENTRANCE_RUN
+  if (e <= HOLD.to) return a + (HOLD.to > HOLD.from ? ((e - HOLD.from) / (HOLD.to - HOLD.from)) * HOLD.units : 0)
+  return a + HOLD.units + (e - HOLD.to) * ENTRANCE_RUN
+}
 
 /** Entrance progress 0..1 at `units` of scroll (with the hold). */
 export function entranceAt(units: number): number {

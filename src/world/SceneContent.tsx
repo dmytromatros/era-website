@@ -17,6 +17,8 @@ import { buildExhibit, toWorld, type ExhibitModel } from './exhibitModel'
 import { Exhibit } from './Exhibit'
 import { Hands } from './firstPerson/Hands'
 import { Shards } from './firstPerson/Shards'
+import { CoffeeScene } from './coffee/CoffeeScene'
+import { Cutscene } from './cutscene/Cutscene'
 import { HeroTransit, type TransitItem } from './HeroTransit'
 import type { KineticOptions } from './KineticText'
 import { ENTRANCE_GEOMETRY, layoutRoute, type ExhibitSize } from './layout'
@@ -153,6 +155,18 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       {/* After the camera rig: the visitor's hands follow the camera placed this frame (D1). */}
       <Hands />
       <Shards />
+      {/* The entrance as one cutscene (fall → look at the hands → walk-in → coffee), once per page view. */}
+      <Cutscene timing={timing} welcome={!!scene.welcome} />
+      {/* The coffee welcome (D3): at the end of the entrance, started by the cutscene. */}
+      {scene.welcome && (
+        <CoffeeScene
+          welcome={scene.welcome}
+          viewpoint={world.layout.rail[1]!}
+          focus={world.layout.look[1]!}
+          floorY={world.layout.zoneFrames[0]?.level ?? 0}
+          timing={timing}
+        />
+      )}
       {arrivedHere && world.layout.stations[0] && (
         <ArrivalDoor viewpoint={world.layout.stations[0].viewpoint} focus={world.layout.stations[0].focus} />
       )}

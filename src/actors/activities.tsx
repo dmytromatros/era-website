@@ -11,6 +11,8 @@ import { useFrame } from '@react-three/fiber'
 import { createContext, useContext, useRef, type ComponentType } from 'react'
 import type * as THREE from 'three'
 import type { ActorDef } from '@/content/schema'
+import { CoffeeCup } from '@/world/coffee/Cup'
+import type { ActorDrive } from './Actor'
 import type { ActivityName } from './catalog'
 import type { Joints } from './rig'
 import { StyledMaterial } from '@/world/toonMaterial'
@@ -20,6 +22,8 @@ export const HOLDING_RATE = 2.4
 
 /** Whether the character holding a prop is on screen this frame (its props pause when not). */
 export const ActorOnScreen = createContext<{ current: boolean }>({ current: true })
+/** The character's outside drive (D3), for props that depend on it (the carried cup). */
+export const ActorDriveContext = createContext<ActorDrive | undefined>(undefined)
 
 export interface PropProps {
   palette: ActorDef['palette']
@@ -29,6 +33,8 @@ export interface PropProps {
 export interface PoseContext {
   /** Side of the element the character works on: +1 = its +x (armR side), −1 = its −x. */
   side: 1 | -1
+  /** Driven from outside (D3: walking, holding a coffee out). */
+  drive?: ActorDrive
 }
 
 export interface Activity {
@@ -201,6 +207,28 @@ const breathe = (j: Joints, t: number) => {
   j.root.position.y = Math.sin(t * 1.8) * 0.006
 }
 
+/**
+ * The cup in the right hand (D3, `carrying`): upright whatever the arm does — the arm's and the
+ * forearm's bends always add up to the same angle (see `carrying`) — shown while carried.
+ */
+function CarriedCup() {
+  const drive = useContext(ActorDriveContext)
+  const group = useRef<THREE.Group>(null)
+  useFrame(() => {
+    if (group.current) group.current.visible = drive?.carrying ?? false
+  })
+  return (
+    <group ref={group} rotation-x={CARRY_ANGLE}>
+      <group position={[0, -0.02, 0.06]}>
+        <CoffeeCup />
+      </group>
+    </group>
+  )
+}
+
+/** Arm + forearm bend while carrying (rad): the cup is turned back by as much. */
+const CARRY_ANGLE = 1.75
+
 export const activities: Record<ActivityName, Activity> = {
   idle: {
     animate: (j, t) => {
@@ -296,6 +324,22 @@ export const activities: Record<ActivityName, Activity> = {
       j.root.position.y = -0.015 - Math.abs(Math.sin(t * 1.2)) * 0.02
     },
     reach: 'hold',
+  },
+
+  /**
+   * Carries something in the right hand (D3: a coffee for the visitor), elbow bent; `drive.offer`
+   * holds it out towards the visitor. The two bends always add up to CARRY_ANGLE.
+   */
+  carrying: {
+    animate: (j, t, { drive }) => {
+      breathe(j, t)
+      const offer = drive?.offer ?? 0
+      const arm = -0.75 - 0.75 * offer
+      j.armR.rotation.set(arm, 0, 0.12 - 0.08 * offer)
+      j.foreR.rotation.x = -CARRY_ANGLE - arm
+      j.armL.rotation.x = Math.sin(t * 1.1) * 0.06
+    },
+    HandR: CarriedCup,
   },
 
   /** Points at the element beside it (either side). */

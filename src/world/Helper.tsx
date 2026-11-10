@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from 'react'
 import { Actor } from '@/actors/Actor'
 import type { ActorDef } from '@/content/schema'
 import { live } from '@/experience/store'
+import { coffeeTalk } from './coffee/coffeeModel'
 import { useTheme } from '@/theme/store'
 import type { PlacedHelper } from './exhibitModel'
 import { htmlPortal } from './htmlPortal'
@@ -36,8 +37,15 @@ export function Helper({ placed, actor, stopIndex, timing, hitKey }: Props) {
   const [attentive, setAttentive] = useState(false)
   const [talking, setTalking] = useState(false)
   const near = useRef(false)
+  // The coffee welcome (D3) is talking: this bubble waits so the two do not overlap.
+  const [hushed, setHushed] = useState(false)
 
   useFrame(() => {
+    if (coffeeTalk.on !== hushed) {
+      setHushed(coffeeTalk.on)
+      // Its bubble comes back and types the lines again: the mouth moves with it.
+      if (!coffeeTalk.on && near.current) setTalking(true)
+    }
     const gap = Math.abs(timeline(live.progress, timing.segments).railIndex - timing.stopRail[stopIndex]!)
     const next = near.current ? gap < FORGET : gap < NOTICE
     if (next !== near.current) {
@@ -58,8 +66,9 @@ export function Helper({ placed, actor, stopIndex, timing, hitKey }: Props) {
         <circleGeometry args={[0.45, 32]} />
         <meshBasicMaterial color={theme.world.shadow} transparent opacity={theme.world.shadowOpacity} />
       </mesh>
-      <Actor def={actor} activity={helper.pose} attentive={attentive} talking={talking} target={placed.target} hitKey={hitKey} />
-      {attentive && docked && (
+      {/* No bubble while hushed — no talking mouth either (it would move with nothing to say). */}
+      <Actor def={actor} activity={helper.pose} attentive={attentive} talking={talking && !hushed} target={placed.target} hitKey={hitKey} />
+      {attentive && !hushed && docked && (
         // Pinned to the overlay's top-left corner; the CSS docks it to the bottom of the screen.
         <Html calculatePosition={() => [0, 0]} portal={htmlPortal} zIndexRange={[20, 11]}>
           <div className={styles.dock}>
@@ -67,7 +76,7 @@ export function Helper({ placed, actor, stopIndex, timing, hitKey }: Props) {
           </div>
         </Html>
       )}
-      {attentive && !docked && (
+      {attentive && !hushed && !docked && (
         <Html position={[bubble === 'right' ? 0.4 : 0, bubbleY, 0]} portal={htmlPortal} zIndexRange={[20, 11]}>
           <div className={bubble === 'right' ? styles.anchorRight : styles.anchorAbove}>
             <SpeechBubble name={`${actor.name} · ${actor.role}`} lines={helper.lines} onDone={stopTalking} />

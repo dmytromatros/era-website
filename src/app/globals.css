@@ -55,6 +55,14 @@ body {
     color 0.3s;
 }
 
+/* A cutscene (D1/D3, experience/scrollLock.ts): the visitor cannot scroll — the scene may.
+   The gutter keeps the layout from shifting when the scrollbar goes. */
+html[data-cutscene] {
+  overflow: hidden;
+  overscroll-behavior: none;
+  scrollbar-gutter: stable;
+}
+
 /* Once the canvas draws the scene, it provides the background (the membrane). */
 html[data-experience='3d'][data-ready] body {
   background: var(--ui-bg);

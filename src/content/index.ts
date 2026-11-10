@@ -1,4 +1,4 @@
 import 'server-only'
 
-export { listPageSlugs, readActorsFor, readPage, readSite } from './read'
+export { listPageSlugs, readActor, readActorsFor, readPage, readSite } from './read'
 export type * from './schema'

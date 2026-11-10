@@ -1,0 +1,9 @@
+name: Mila
+role: Office manager
+# The first character who walks (wow-plan D3): she brings the visitor a coffee right after they
+# fall through the page. Her ponytail bounces on every step.
+palette: { skin: "#f3c9a8", shirt: "#e86f8a", pants: "#2c2f4a", accent: "#ffd27a", hair: "#5a3420" }
+accessories: [ponytail, badge]
+reactions:
+  - { move: jump, emoji: "😊" }
+annoyed: { move: shrug, emoji: "🙂" }
