@@ -65,6 +65,8 @@ interface ExperienceState {
   handedOver: boolean
   /** Bumped to fire the membrane ripple (value = performance.now()). */
   rippleAt: number
+  /** Where that ripple starts (screen uv); null = at the pointer. */
+  rippleCenter: { x: number; y: number } | null
   navigate: ((href: string, opts?: { scroll?: boolean }) => void) | null
   portal: PortalState
   /** Set before a portal / back navigation; consumed by the next page. */
@@ -80,7 +82,7 @@ interface ExperienceState {
   setElements: (sceneKey: string, blocks: PageElements) => void
   markCanvasReady: (sceneKey: string) => void
   setHandedOver: (value: boolean) => void
-  ripple: () => void
+  ripple: (center?: { x: number; y: number }) => void
   setNavigate: (fn: (href: string, opts?: { scroll?: boolean }) => void) => void
   setPortal: (phase: PortalPhase, extra?: Partial<Omit<PortalState, 'phase' | 'since'>>) => void
   setArrival: (arrival: Arrival | null) => void
@@ -96,6 +98,7 @@ export const useExperience = create<ExperienceState>((set, get) => ({
   canvasReadyFor: null,
   handedOver: false,
   rippleAt: -Infinity,
+  rippleCenter: null,
   navigate: null,
   portal: { phase: 'idle', origin: { x: 0.5, y: 0.5 }, target: null, since: 0 },
   arrival: null,
@@ -114,9 +117,9 @@ export const useExperience = create<ExperienceState>((set, get) => ({
   },
   setHandedOver: (handedOver) => {
     if (get().handedOver === handedOver) return
-    set({ handedOver, rippleAt: performance.now() })
+    set({ handedOver, rippleAt: performance.now(), rippleCenter: null })
   },
-  ripple: () => set({ rippleAt: performance.now() }),
+  ripple: (center) => set({ rippleAt: performance.now(), rippleCenter: center ?? null }),
   setNavigate: (navigate) => set({ navigate }),
   setPortal: (phase, extra) => set({ portal: { ...get().portal, ...extra, phase, since: performance.now() } }),
   setArrival: (arrival) => set({ arrival }),

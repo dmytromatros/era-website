@@ -9,7 +9,26 @@
  * The camera rail has control points: [start, entered, point 0, point 1, …].
  * `railIndex` is a float position on that list: 0 = start, 1 = entered, 2 = point 0, …
  */
-export const ENTRANCE = 1.6
+/** Scroll units the entrance would take without the hold. */
+export const ENTRANCE_RUN = 1.6
+/**
+ * The hold (D1, Dima 2026-11-10: "give it a bit more scroll"): right after the crack the
+ * entrance progress barely moves for `units` of scroll — the visitor stumbles and looks at their
+ * hands while scrolling a couple of wheel clicks, instead of skipping it. Before `from` the
+ * progress is exactly as before (the seam and the crack are untouched), after `to` it runs at the
+ * usual rate.
+ */
+export const HOLD = { from: 0.16, to: 0.2, units: 0.7 } as const
+/** Scroll units of the whole entrance. */
+export const ENTRANCE = HOLD.from * ENTRANCE_RUN + HOLD.units + (1 - HOLD.to) * ENTRANCE_RUN
+
+/** Entrance progress 0..1 at `units` of scroll (with the hold). */
+export function entranceAt(units: number): number {
+  const a = HOLD.from * ENTRANCE_RUN
+  if (units <= a) return Math.max(units / ENTRANCE_RUN, 0)
+  if (units <= a + HOLD.units) return HOLD.from + ((HOLD.to - HOLD.from) * (units - a)) / HOLD.units
+  return Math.min(HOLD.to + (units - a - HOLD.units) / ENTRANCE_RUN, 1)
+}
 export const KEY_UNITS = 1.3
 export const PASS_UNITS = 0.6
 
@@ -44,7 +63,7 @@ export interface TimelineState {
 export function timeline(units: number, segments: Segment[]): TimelineState {
   const u = Math.min(Math.max(units, 0), totalUnits(segments))
   if (u < ENTRANCE || segments.length === 0) {
-    const entrance = clamp01(u / ENTRANCE)
+    const entrance = clamp01(entranceAt(u))
     return { entrance, railIndex: easeInOutCubic(entrance) }
   }
   let rest = u - ENTRANCE

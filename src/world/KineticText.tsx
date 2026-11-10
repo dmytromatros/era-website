@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { live, useExperience } from '@/experience/store'
 import { useQualitySettings } from './quality'
-import { ENTRANCE, timeline, type Segment } from './timeline'
+import { entranceAt, timeline, type Segment } from './timeline'
 import { zoneOpacity, type RailRange } from './widgetZone'
 import { glyphsFromBounds, KINETIC_MAX_GLYPHS, stepGlyphs, tap, writeMotion, type Glyph } from './kineticModel'
 
@@ -141,7 +141,7 @@ export function useKineticText(options: KineticOptions, size: number) {
     const m = mesh.current
     const list = glyphs.current
     if (!m || !list.length) return
-    const e = Math.min(Math.max(live.progress / ENTRANCE, 0), 1)
+    const e = Math.min(Math.max(entranceAt(live.progress), 0), 1)
     // 0 until the hero has landed after the handover (the swap shows the untouched heading),
     // and outside the module's zone.
     const weight =

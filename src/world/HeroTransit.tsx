@@ -9,7 +9,7 @@ import { ElementView, textKeys } from './ElementView'
 import type { KineticOptions } from './KineticText'
 import { toWorld, type Vec3 } from './exhibitModel'
 import { ENTRANCE_GEOMETRY } from './layout'
-import { ENTRANCE } from './timeline'
+import { entranceAt } from './timeline'
 
 const { cameraStart, heroDistance } = ENTRANCE_GEOMETRY
 const PLANE_Z = cameraStart[2] - heroDistance
@@ -98,7 +98,7 @@ export function HeroTransit({
     const g = group.current
     if (!g) return
     const handedOver = useExperience.getState().handedOver
-    const e = Math.min(Math.max(live.progress / ENTRANCE, 0), 1)
+    const e = Math.min(Math.max(entranceAt(live.progress), 0), 1)
     // 1. Peel (e 0 → 0.25): each element lifts off the page towards the viewer and tips a
     //    little, while the film behind it bulges and tears — the moment it visibly becomes 3D.
     const peel = THREE.MathUtils.smoothstep(e, 0, 0.2)

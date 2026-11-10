@@ -4,7 +4,7 @@ import { accentAt, DOLLY, dollyFov, dollyPosition, dollyTanHalf } from './cinema
 import { ENTRANCE_GEOMETRY, layoutRoute, type Vec3 } from './layout'
 import { buildOffice } from './officeModel'
 import { planTiming, routePlan } from './route'
-import { timeline } from './timeline'
+import { ENTRANCE, timeline } from './timeline'
 
 const BASE = ENTRANCE_GEOMETRY.fov
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
@@ -75,7 +75,7 @@ describe('background blur only at accents (B3)', () => {
 
   it('fades smoothly as the camera arrives (no jump over a small scroll step)', () => {
     let prev = accentAt(timeline(0, timing.segments).railIndex, timing.keyRail)
-    const total = 1.6 + timing.segments.reduce((n, s) => n + s.units, 0)
+    const total = ENTRANCE + timing.segments.reduce((n, s) => n + s.units, 0)
     for (let u = 0; u <= total; u += 0.005) {
       const a = accentAt(timeline(u, timing.segments).railIndex, timing.keyRail)
       expect(Math.abs(a - prev)).toBeLessThan(0.15)

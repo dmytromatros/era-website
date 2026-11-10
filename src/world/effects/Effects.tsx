@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { live, useExperience } from '@/experience/store'
 import * as THREE from 'three'
 import { useQualitySettings } from '../quality'
-import { ENTRANCE } from '../timeline'
+import { entranceAt } from '../timeline'
 import { cameraFocus } from '../cinema'
 import { useStylePreset } from '../style'
 import { useXRay } from '../xrayState'
@@ -67,17 +67,18 @@ export function Effects() {
   }, [style, preset, outlines])
 
   useFrame(() => {
-    const { rippleAt, handedOver } = useExperience.getState()
+    const { rippleAt, rippleCenter, handedOver } = useExperience.getState()
     // X-ray (B4) shows the bare world: no grade, outlines or blur over the blueprint.
     const xray = useXRay.getState().on
     if (rippleAt !== seen.current) {
       seen.current = rippleAt
-      ripple.setCenter(live.pointerUv.x, live.pointerUv.y)
+      const c = rippleCenter ?? live.pointerUv
+      ripple.setCenter(c.x, c.y)
     }
     ripple.age = Math.min((performance.now() - rippleAt) / 1000, 10)
     // The style must not touch the swap frame or the resting hero: 0 until the handover and at
     // the top, then grows with the entrance (live.progress is already smoothed, rule 1).
-    const entrance = Math.min(Math.max(live.progress / ENTRANCE, 0), 1)
+    const entrance = Math.min(Math.max(entranceAt(live.progress), 0), 1)
     style.mix = handedOver && preset.post && !xray ? THREE.MathUtils.smoothstep(entrance, STYLE_FROM, STYLE_TO) : 0
     // Background blur: focused on what the camera looks at (cinema.ts), after the entrance, and
     // only at an accent (a key stop) — sharp while flying between.

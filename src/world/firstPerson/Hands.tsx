@@ -4,14 +4,14 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { live } from '@/experience/store'
 import type { Theme } from '@/theme/tokens'
 import { useTheme } from '@/theme/store'
 import { warmPrograms } from '../precompile'
 import { useStylePreset } from '../style'
-import { ENTRANCE } from '../timeline'
 import { applyToon } from '../toonMaterial'
-import { handsAt, type HandPose } from './handsModel'
+import { cameraBody, crackFrame } from './crack'
+import { FOREARM, SLEEVE, handsAt, type HandPose } from './handsModel'
+import { live } from '@/experience/store'
 
 type Colors = Theme['world']['hero']
 
@@ -43,15 +43,15 @@ export function handGeometry(side: -1 | 1, colors: Colors): THREE.BufferGeometry
   })
   add(new THREE.BoxGeometry(0.024, 0.056, 0.028).rotateZ(side * 0.55).translate(-side * 0.053, 0.03, -0.006), skin)
 
-  // Forearm: back, down and a little out from the wrist.
-  const along = new THREE.Vector3(side * 0.25, -0.9, 1).normalize()
+  // Forearm: back from the bent wrist (handsAt turns it towards the shoulder).
+  const along = new THREE.Vector3(...FOREARM).normalize()
   const back = new THREE.Vector3(0, 0, 1).addScaledVector(along, -along.z).normalize()
   const across = new THREE.Vector3().crossVectors(along, back)
   const basis = new THREE.Matrix4().makeBasis(across, along, back)
   const onArm = (g: THREE.BufferGeometry, from: number, len: number) =>
     g.translate(0, len / 2, 0).applyMatrix4(basis).translate(...along.clone().multiplyScalar(from).toArray())
   add(onArm(new THREE.BoxGeometry(0.104, 0.045, 0.08), -0.004, 0.045), new THREE.Color(colors.cuff))
-  add(onArm(new THREE.BoxGeometry(0.096, 0.5, 0.074), 0.04, 0.5), new THREE.Color(colors.sleeve))
+  add(onArm(new THREE.BoxGeometry(0.096, SLEEVE - 0.04, 0.074), 0.04, SLEEVE - 0.04), new THREE.Color(colors.sleeve))
 
   const merged = mergeGeometries(parts)!
   for (const g of parts) g.dispose()
@@ -62,15 +62,15 @@ export function handGeometry(side: -1 | 1, colors: Colors): THREE.BufferGeometry
 const place = (mesh: THREE.Mesh | null, pose: HandPose) => {
   if (!mesh) return
   mesh.position.set(...pose.position)
-  mesh.rotation.set(...pose.rotation)
+  mesh.quaternion.set(...pose.quaternion)
 }
 
 /**
- * The visitor's own hands (wow-plan D1): they rise from below the frame, press on the film,
- * pull the tear open between the palms and reach through — all from `live.progress`
- * (handsModel.ts). Fixed to the camera. Two draw calls while the entrance plays, none before
- * or after (not visible). Their shader program is compiled on mount, so the first entrance
- * does not hitch.
+ * The visitor's own hands (wow-plan D1): they rise from below the frame and lean on the film
+ * harder as the visitor scrolls (`live.progress`); when it gives way (the crack, breakModel.ts)
+ * they lose their support and fall out of the frame (handsModel.ts). Fixed to the camera. Two
+ * draw calls while they are in view, none before or after (not visible). Their shader program
+ * is compiled on mount, so the first entrance does not hitch.
  */
 export function Hands() {
   const { world } = useTheme()
@@ -111,16 +111,18 @@ export function Hands() {
     }
   }, [gl, scene, camera, geometry, material, preset])
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     const g = group.current
     if (!g) return
-    const e = Math.min(Math.max(live.progress / ENTRANCE, 0), 1)
-    const pose = handsAt(e, live.tear, { aspect: size.width / size.height, fov: camera.fov })
-    g.visible = pose.visible
-    if (!pose.visible) return
-    // Follow the camera (CameraRig has already placed it this frame: mounted before us).
-    camera.updateMatrixWorld()
-    g.matrix.copy(camera.matrixWorld)
+    const aspect = size.width / size.height
+    const { e, crack, since } = crackFrame(clock.elapsedTime, aspect)
+    const pose = handsAt(e, live.tear, { aspect, fov: camera.fov }, crack)
+    // Arrived mid-page (no crack to play): no hands either.
+    g.visible = pose.visible && since !== Infinity
+    if (!g.visible) return
+    // Hang on the body: the camera on its rail without the crack's kick (CameraRig wrote it
+    // this frame — it is mounted before us), so a nod or a glance brings the hands into view.
+    g.matrix.copy(cameraBody)
     g.matrixWorldNeedsUpdate = true
     place(left.current, pose.left)
     place(right.current, pose.right)

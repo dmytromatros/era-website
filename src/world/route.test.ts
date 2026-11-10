@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Page } from '@/content/schema'
 import { ARCH, at, forward, layoutRoute, right, type Box, type Vec3 } from './layout'
 import { planTiming, routePlan, TRANSITION_WAYPOINTS } from './route'
-import { dwellEase, ENTRANCE, scrollToUnits, timeline, totalUnits } from './timeline'
+import { dwellEase, ENTRANCE, ENTRANCE_RUN, HOLD, entranceAt, scrollToUnits, timeline, totalUnits } from './timeline'
 import { moduleRailRange, ZONE_FADE, ZONE_MARGIN, zoneOpacity } from './widgetZone'
 
 const hero = { type: 'hero' as const, heading: ['Hi'], actions: [], tags: [], helpers: [] }
@@ -214,5 +214,29 @@ describe('widget zones (widgets animate only inside their own module)', () => {
 
   it('does not exist for a module without stops', () => {
     expect(moduleRailRange(plan, timing, 99)).toBeNull()
+  })
+})
+
+describe('entrance hold after the crack (D1)', () => {
+  it('is exactly the old progress up to the hold (the seam and the crack are untouched)', () => {
+    for (let u = 0; u <= HOLD.from * ENTRANCE_RUN; u += 0.01) expect(entranceAt(u)).toBeCloseTo(u / ENTRANCE_RUN, 10)
+  })
+
+  it('barely moves over the hold, then runs at the usual rate to 1 at the end of the entrance', () => {
+    const a = HOLD.from * ENTRANCE_RUN
+    expect(entranceAt(a + HOLD.units) - entranceAt(a)).toBeCloseTo(HOLD.to - HOLD.from, 10)
+    expect((entranceAt(a + HOLD.units + 0.1) - entranceAt(a + HOLD.units)) / 0.1).toBeCloseTo(1 / ENTRANCE_RUN, 10)
+    expect(entranceAt(ENTRANCE)).toBeCloseTo(1, 10)
+    expect(entranceAt(ENTRANCE + 1)).toBe(1)
+  })
+
+  it('is continuous and never goes back', () => {
+    let prev = 0
+    for (let u = 0; u <= ENTRANCE + 0.1; u += 0.001) {
+      const e = entranceAt(u)
+      expect(e).toBeGreaterThanOrEqual(prev)
+      expect(e - prev).toBeLessThan(0.002)
+      prev = e
+    }
   })
 })

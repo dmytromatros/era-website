@@ -27,6 +27,8 @@ export function FramePacer() {
     let last = performance.now()
     // R3F starts the clock at 0 in this mode; continue from there (the first step stays small).
     let clock = get().clock.elapsedTime
+    // `?slowmo=0.2` (debugging, e.g. the crack of D1): the scene clock runs slower.
+    const slowmo = Number(new URLSearchParams(location.search).get('slowmo')) || 1
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
       if (pacer.parked || document.hidden) {
@@ -36,7 +38,7 @@ export function FramePacer() {
       const r = pace(now, next)
       next = r.next
       if (!r.draw) return
-      clock += Math.min((now - last) / 1000, MAX_STEP)
+      clock += Math.min((now - last) / 1000, MAX_STEP) * slowmo
       last = now
       // Waves on a still landing: the film alone (it is opaque there; the office behind it is
       // not drawn at all). Layer 0 = everything, as always.
