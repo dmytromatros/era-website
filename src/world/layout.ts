@@ -56,11 +56,24 @@ export interface Mezzanine {
   half: number
 }
 
+/** One flight of stairs, as the walking camera needs it (D2: a step onto each stair). */
+export interface StairFlight {
+  /** Floor point where the first step starts. */
+  from: Vec3
+  heading: number
+  /** Length along the heading (m), height (m, negative = down), number of steps. */
+  run: number
+  rise: number
+  steps: number
+}
+
 export interface Architecture {
   /** Corridor sides (rendered as glass partitions by the office). */
   walls: Box[]
   /** Stair steps, solid blocks standing on the ground. */
   stairs: Box[]
+  /** The same stairs as flights. */
+  flights: StairFlight[]
   mezzanines: Mezzanine[]
   /** Floor that furniture and columns must keep off. */
   clear: ClearRect[]
@@ -183,6 +196,7 @@ export function layoutRoute(plan: RoutePlan, sizes: ExhibitSize[], aspect = 16 /
     [cameraEntered[0], cameraEntered[1] - 0.2, cameraEntered[2] - 20],
   ]
   const stairs: Box[] = []
+  const flights: StairFlight[] = []
   const clear: ClearRect[] = []
   const zones: ZoneRecord[] = []
 
@@ -213,6 +227,7 @@ export function layoutRoute(plan: RoutePlan, sizes: ExhibitSize[], aspect = 16 /
         stairs.push({ center: [c[0], top / 2, c[2]], size: [ARCH.stairWidth, top, run / n], yaw: frame.heading })
       }
       clear.push({ frame, from: start - 0.6, to: start + run + 0.6, half: ARCH.stairWidth / 2 + 0.6 })
+      flights.push({ from: at(frame, start, 0), heading: frame.heading, run, rise, steps: n })
       rail.push(at(frame, start, 0, ARCH.eye), at(frame, start + run, 0, ARCH.eye + rise))
       look.push(at(frame, start + run + 4, 0, ARCH.eye + rise), at(frame, start + run + 10, 0, ARCH.eye + rise))
       const top = at(frame, start + run + 0.5, 0)
@@ -296,6 +311,7 @@ export function layoutRoute(plan: RoutePlan, sizes: ExhibitSize[], aspect = 16 /
     architecture: {
       walls: buildWalls(zones, hw),
       stairs,
+      flights,
       mezzanines: mezzanines(zones, hw),
       clear: [...clear, ...zoneClears(zones, hw)],
     },

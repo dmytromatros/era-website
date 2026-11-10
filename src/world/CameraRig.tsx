@@ -9,6 +9,7 @@ import { accentAt, cameraFocus, dollyFov, dollyPosition } from './cinema'
 import { ZERO_KICK, entranceBreak, kickAt } from './firstPerson/breakModel'
 import { cameraBody, crackFrame } from './firstPerson/crack'
 import { glanceYaw } from './firstPerson/handsModel'
+import { newWalk, stepWalk, walkNow } from './firstPerson/walkModel'
 import { ENTRANCE_GEOMETRY, type WorldLayout } from './layout'
 import type { Timing } from './route'
 import { timeline } from './timeline'
@@ -33,6 +34,15 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
   const tmpPos = useMemo(() => new THREE.Vector3(), [])
   const tmpLook = useMemo(() => new THREE.Vector3(), [])
   const tmpTarget = useMemo(() => new THREE.Vector3(), [])
+  // Walking (D2): the gait state and how much walking is allowed (smoothed).
+  const walk = useMemo(() => ({ state: newWalk(), weight: 0, rail: new THREE.Vector3() }), [])
+  // ?debug=1: the walk's numbers for tuning (window.__eraWalk).
+  useLayoutEffect(() => {
+    if (new URLSearchParams(location.search).get('debug') !== '1') return
+    const w = window as unknown as { __eraWalk?: unknown }
+    w.__eraWalk = { state: walk.state, get now() { return walkNow.walk } }
+    return () => void delete w.__eraWalk
+  }, [walk])
 
   // New page: snap to the start (the hero must line up with the DOM).
   useLayoutEffect(() => {
@@ -44,7 +54,7 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     camera.lookAt(current.current.lookAt)
   }, [camera, look])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     // `live.progress` is already smoothed (world/Driver.tsx); a second smoothing here would
     // make the camera lag behind the elements and the film.
     const t = timeline(live.progress, timing.segments)
@@ -55,6 +65,10 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     const u = Math.min(Math.max(c.index / last, 0), 1)
     rail.getPoint(u, tmpPos)
     look.getPoint(u, tmpLook)
+
+    // The walk is measured on the rail itself (not the pointer parallax: moving the mouse at a
+    // stop must not make the visitor step).
+    walk.rail.copy(tmpPos)
 
     // Subtle pointer parallax, faded in after the entrance so the start stays pixel-exact.
     const parallax = THREE.MathUtils.smoothstep(t.entrance, 0.3, 1) * 0.25
@@ -103,7 +117,27 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     camera.position.copy(tmpPos)
     c.lookAt.copy(tmpLook)
     camera.lookAt(c.lookAt)
-    // The body (the hands hang on it) stays on the rail; only the head is kicked.
+
+    // Walking (D2, walkModel.ts): steps from the distance walked along the rail, a run when fast,
+    // a step onto each stair, a lean into turns. None during the entrance or a portal (faded).
+    const allowed = THREE.MathUtils.smoothstep(t.entrance, 0.9, 1) * (portal.phase === 'idle' ? 1 : 0)
+    walk.weight += (allowed - walk.weight) * (1 - Math.exp(-Math.min(delta, 0.1) * 4))
+    const w = stepWalk(walk.state, {
+      position: [walk.rail.x, walk.rail.y, walk.rail.z],
+      look: [tmpLook.x, tmpLook.y, tmpLook.z],
+      dt: delta,
+      flights: layout.architecture.flights,
+      weight: walk.weight,
+    })
+    walkNow.walk = w
+    if (w.moving > 0 || w.up !== 0) {
+      camera.translateY(w.up)
+      camera.translateX(w.side)
+      camera.rotateX(w.pitch)
+      camera.rotateZ(w.roll)
+    }
+
+    // The body (the hands hang on it) walks with the head; only the crack's kick is the head's.
     camera.updateMatrixWorld()
     cameraBody.copy(camera.matrixWorld)
     if (kick !== ZERO_KICK) {

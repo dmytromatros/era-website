@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bodyToCamera, kickAt } from './breakModel'
-import { HANDS, LOOK, glanceYaw, handsAt, leanAt, palmPoint, project, sleeveEnd, tearPoint, unproject, type Crack, type HandPose, type View } from './handsModel'
+import { HANDS, LOOK, glanceYaw, handsAt, palmNormal, qRotate as qRotateTest, walkHandsAt, leanAt, palmPoint, project, sleeveEnd, tearPoint, unproject, type Crack, type HandPose, type View } from './handsModel'
 
 const WIDE: View = { aspect: 1280 / 800, fov: 42 }
 const TALL: View = { aspect: 517 / 709, fov: 42 }
@@ -178,6 +178,73 @@ describe('hands (D1): the confused look', () => {
         expect(sleeveEnd(p.right)[0] - sleeveEnd(p.left)[0]).toBeGreaterThan(0.2)
       }
     }
+  })
+})
+
+describe('hands (D2): walking', () => {
+  it('are not there standing still', () => {
+    expect(walkHandsAt({ phase: 1, moving: 0, run: 0 }, WIDE).visible).toBe(false)
+  })
+
+  it('peek into the bottom of the frame as they swing forward, never up to the cards', () => {
+    for (const view of VIEWS) {
+      for (const run of [0, 1]) {
+        let top = -Infinity
+        for (let phase = 0; phase < Math.PI * 2; phase += 0.05) {
+          const p = walkHandsAt({ phase, moving: 1, run }, view)
+          for (const uv of p.palms) top = Math.max(top, uv.y)
+          expect(sleeveEnd(p.right, 'straight')[0] - sleeveEnd(p.left, 'straight')[0]).toBeGreaterThan(0.2)
+        }
+        expect(top).toBeGreaterThan(-0.15) // a palm comes close enough for the fingers to show
+        expect(top).toBeLessThan(0.3) // and stays in the bottom part
+      }
+    }
+  })
+
+  it('palms face in, towards each other, all through the swing', () => {
+    for (const view of VIEWS) {
+      for (let phase = 0; phase < Math.PI * 2; phase += 0.2) {
+        const p = walkHandsAt({ phase, moving: 1, run: 0.5 }, view)
+        expect(palmNormal(p.left)[0]).toBeGreaterThan(0.8) // left palm → right
+        expect(palmNormal(p.right)[0]).toBeLessThan(-0.8)
+      }
+    }
+  })
+
+  it('bend at the elbow: the forearm runs out and down to an elbow outside the picture', () => {
+    for (const view of VIEWS) {
+      for (let phase = 0; phase < Math.PI * 2; phase += 0.3) {
+        const p = walkHandsAt({ phase, moving: 1, run: 0.5 }, view)
+        for (const [h, side] of [[p.left, -1], [p.right, 1]] as const) {
+          const end = sleeveEnd(h, 'straight')
+          expect(end[0] * side).toBeGreaterThan(h.position[0] * side) // out
+          expect(end[1]).toBeLessThan(h.position[1]) // down
+          const uv = project(end, view)
+          expect(end[2] > -0.1 || uv.y < 0 || uv.x < 0 || uv.x > 1).toBe(true) // the elbow is off-screen
+        }
+      }
+    }
+  })
+
+  it('have a straight wrist: the fingers carry on from the forearm (no hand bent sideways)', () => {
+    for (const view of VIEWS) {
+      for (let phase = 0; phase < Math.PI * 2; phase += 0.3) {
+        const p = walkHandsAt({ phase, moving: 1, run: 0.5 }, view)
+        for (const [h, side] of [[p.left, -1], [p.right, 1]] as const) {
+          const fingers = qRotateTest(h.quaternion, [0, 1, 0])
+          // Fingers point forward (−z) and a little in — never out to the side.
+          expect(fingers[2]).toBeLessThan(-0.5)
+          expect(fingers[0] * -side).toBeGreaterThan(-0.05)
+        }
+      }
+    }
+  })
+
+  it('swing in turn (left forward while right back)', () => {
+    const p = walkHandsAt({ phase: Math.PI / 2, moving: 1, run: 0 }, WIDE)
+    expect(p.palms[0].y).toBeGreaterThan(p.palms[1].y)
+    const q = walkHandsAt({ phase: -Math.PI / 2, moving: 1, run: 0 }, WIDE)
+    expect(q.palms[1].y).toBeGreaterThan(q.palms[0].y)
   })
 })
 

@@ -50,13 +50,15 @@ export interface QualitySettings {
   waves: number
   /** Shards of the film flying out when it gives way (D1): how many (one instanced mesh). */
   shards: number
+  /** The hands swinging at the bottom of the frame while walking (D2; +2 draw calls while walking). */
+  walkHands: boolean
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, physicsHz: 30, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10, waves: 0, shards: 16 },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0, waves: 160, shards: 28 },
-  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 16, portalScale: 1, portalMaxFps: 0, waves: 256, shards: 40 },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, physicsHz: 30, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10, waves: 0, shards: 16, walkHands: false },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0, waves: 160, shards: 28, walkHands: true },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 16, portalScale: 1, portalMaxFps: 0, waves: 256, shards: 40, walkHands: true },
 }
 
 const STORAGE_KEY = 'era-quality'

@@ -79,6 +79,16 @@ export const glanceYaw = (view: View) => {
  * it; `handsAt` turns the hand so that this axis points to the shoulder.
  */
 export const FOREARM: Vec3 = [0, -0.62, 0.78]
+/**
+ * The walking hand's forearm (D2): a straight wrist, the hand just carries on from the forearm
+ * (bent a touch back). A bent wrist turned palm-in looked broken sideways (Dima 2026-11-10).
+ */
+export const FOREARM_STRAIGHT: Vec3 = [0, -0.97, 0.24]
+export type Wrist = 'bent' | 'straight'
+/** Sleeve length of the walking hand: wrist to just past the elbow (out of the frame). */
+export const SLEEVE_WALK = 0.62
+export const sleeveOf = (w: Wrist) => (w === 'bent' ? SLEEVE : SLEEVE_WALK)
+export const forearmOf = (w: Wrist): Vec3 => (w === 'bent' ? FOREARM : FOREARM_STRAIGHT)
 /** Sleeve length from the wrist (m) — long enough to always leave the frame. */
 export const SLEEVE = 1.45
 
@@ -209,9 +219,93 @@ export const palmPoint = (h: HandPose): Vec3 => {
 }
 
 /** Where the elbow end of the sleeve is (camera space) — tests check the sleeves never cross. */
-export const sleeveEnd = (h: HandPose): Vec3 => {
-  const a = qRotate(h.quaternion, norm(FOREARM))
-  return [h.position[0] + a[0] * SLEEVE, h.position[1] + a[1] * SLEEVE, h.position[2] + a[2] * SLEEVE]
+export const sleeveEnd = (h: HandPose, wrist: Wrist = 'bent'): Vec3 => {
+  const a = qRotate(h.quaternion, norm(forearmOf(wrist)))
+  const l = sleeveOf(wrist)
+  return [h.position[0] + a[0] * l, h.position[1] + a[1] * l, h.position[2] + a[2] * l]
+}
+
+const shoulderOf = (side: -1 | 1): Vec3 => [side * HANDS.shoulder[0], HANDS.shoulder[1], HANDS.shoulder[2]]
+
+/**
+ * Put a hand with its palm centre at `palm`: turn it so the forearm points back to the shoulder,
+ * the wrist goes where that leaves the palm on its spot (two passes: the aim depends on the wrist).
+ */
+function place(palm: Vec3, pose: Quat, shoulder: Vec3, wrist: Wrist = 'bent'): HandPose {
+  const forearm = norm(forearmOf(wrist))
+  let position: Vec3 = [palm[0], palm[1] - PALM_CENTER, palm[2]]
+  let quaternion = pose
+  for (let i = 0; i < 2; i++) {
+    const want = norm([shoulder[0] - position[0], shoulder[1] - position[1], shoulder[2] - position[2]])
+    quaternion = qMul(qBetween(qRotate(pose, forearm), want), pose)
+    const up = qRotate(quaternion, [0, PALM_CENTER, 0])
+    position = [palm[0] - up[0], palm[1] - up[1], palm[2] - up[2]]
+  }
+  return { position, quaternion }
+}
+
+/**
+ * Turn a placed hand about its own forearm (which keeps pointing at the shoulder) until the palm
+ * faces `toward` as closely as it can — then put the palm back on its spot.
+ */
+function turnPalm(h: HandPose, palm: Vec3, toward: Vec3, wrist: Wrist): HandPose {
+  const a = qRotate(h.quaternion, norm(forearmOf(wrist)))
+  const flat = (v: Vec3): Vec3 => {
+    const d = v[0] * a[0] + v[1] * a[1] + v[2] * a[2]
+    return norm([v[0] - a[0] * d, v[1] - a[1] * d, v[2] - a[2] * d])
+  }
+  const n = flat(qRotate(h.quaternion, [0, 0, -1]))
+  const t = flat(toward)
+  const cross: Vec3 = [n[1] * t[2] - n[2] * t[1], n[2] * t[0] - n[0] * t[2], n[0] * t[1] - n[1] * t[0]]
+  const angle = Math.atan2(cross[0] * a[0] + cross[1] * a[1] + cross[2] * a[2], n[0] * t[0] + n[1] * t[1] + n[2] * t[2])
+  const s = Math.sin(angle / 2)
+  const quaternion = qMul([a[0] * s, a[1] * s, a[2] * s, Math.cos(angle / 2)], h.quaternion)
+  const up = qRotate(quaternion, [0, PALM_CENTER, 0])
+  return { position: [palm[0] - up[0], palm[1] - up[1], palm[2] - up[2]], quaternion }
+}
+
+/** Which way a hand's palm faces (same space as the pose). */
+export const palmNormal = (h: HandPose): Vec3 => qRotate(h.quaternion, [0, 0, -1])
+
+/** What the walking hands need from the gait (walkModel Walk). */
+export interface Gait {
+  phase: number
+  moving: number
+  run: number
+}
+
+/**
+ * The hands while walking (D2, body space): they swing in turn with the steps — each one peeks
+ * into the bottom of the frame as it swings forward — higher and harder at a run, down out of
+ * the frame at a standstill, palms facing in. They never reach up to where the cards are.
+ */
+export function walkHandsAt(g: Gait, view: View): HandsPose {
+  const k = Math.max(1, 1 / view.aspect) ** 0.75
+  const z0 = -0.45 * k
+  const halfWidth = Math.tan(((view.fov / 2) * Math.PI) / 180) * view.aspect * -z0
+  const amp = g.moving * (1 + 1.2 * g.run)
+  const pose = (side: -1 | 1): HandPose => {
+    // Left arm forward with the right foot: opposite swings, one cycle per two footfalls.
+    const swing = side * -Math.sin(g.phase)
+    const fwd = Math.max(swing, 0)
+    const x = Math.min(0.22 * k, Math.max(0.75 * halfWidth, 0.09))
+    const palm: Vec3 = [
+      // Swinging forward, the hand comes in towards the middle (arms bent, as when jogging).
+      side * x * (1 - 0.35 * fwd * Math.min(amp, 1)),
+      (-0.27 + 0.065 * fwd * amp - 0.02 * g.run - 0.4 * (1 - g.moving)) * k,
+      z0 - 0.12 * swing * amp,
+    ]
+    // Bent at the elbow (Dima 2026-11-10: "not straight like sticks"): the forearm runs from the
+    // hand down, out and back to the elbow — below and outside the frame, swinging with the arm —
+    // instead of all the way to the shoulder. Straight wrist, fingers forward and a little in,
+    // palms facing in, towards each other; the edge of the hand leads.
+    const elbow: Vec3 = [side * (x + 0.2 * k), palm[1] - 0.26 * k, palm[2] + 0.36 * k + 0.05 * swing * amp]
+    const placed = place(palm, qEuler(-1.05 - 0.3 * swing * amp, 0, 0), elbow, 'straight')
+    return turnPalm(placed, palm, [-side, 0, 0], 'straight')
+  }
+  const left = pose(-1)
+  const right = pose(1)
+  return { visible: g.moving > 0.02, left, right, press: 0, palms: [project(palmPoint(left), view), project(palmPoint(right), view)] }
 }
 
 export function handsAt(e: number, tear: Uv, view: View, crack: Crack | null = null): HandsPose {
@@ -227,21 +321,7 @@ export function handsAt(e: number, tear: Uv, view: View, crack: Crack | null = n
   const halfWidth = t * view.aspect * d
   const gap = Math.min(Math.max(HANDS.gap * halfWidth, HANDS.minGap), HANDS.maxGap)
 
-  const shoulderOf = (side: -1 | 1): Vec3 => [side * HANDS.shoulder[0], HANDS.shoulder[1], HANDS.shoulder[2]]
 
-  // Aim the forearm at the shoulder; the wrist goes where it puts the palm on its spot (two
-  // passes: the aim depends on the wrist).
-  const place = (palm: Vec3, pose: Quat, shoulder: Vec3): HandPose => {
-    let position: Vec3 = [palm[0], palm[1] - PALM_CENTER, palm[2]]
-    let quaternion = pose
-    for (let i = 0; i < 2; i++) {
-      const want = norm([shoulder[0] - position[0], shoulder[1] - position[1], shoulder[2] - position[2]])
-      quaternion = qMul(qBetween(qRotate(pose, norm(FOREARM)), want), pose)
-      const up = qRotate(quaternion, [0, PALM_CENTER, 0])
-      position = [palm[0] - up[0], palm[1] - up[1], palm[2] - up[2]]
-    }
-    return { position, quaternion }
-  }
 
   // The confused look: the hands come up in front, below the eyes; each is lifted and turned
   // over while the head looks at it.
