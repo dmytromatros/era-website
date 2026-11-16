@@ -8,7 +8,7 @@
  */
 import type { Vec3 } from '../layout'
 import { alongPath } from './navGrid'
-import { burstTime, CROWD, JOLT, MEET, meetTime, type Crowd, type Person } from './crowdModel'
+import { burstTime, CROWD, JOLT, MEET, meetTime, REACT, type Crowd, type Person, type Reaction } from './crowdModel'
 
 export interface Pose {
   /** Floor point under the hips, facing, and how far the body is raised / lowered (m). */
@@ -305,8 +305,44 @@ export function onSpinningChair(pose: Pose, pivot: Vec3, angle: number, speed: n
   }
 }
 
-/** The pose of person `i` at scene time `now`. */
+/** A click reaction over any pose (u seconds in); seated people stay seated (no jump). */
+function reacting(base: Joints, u: number, kind: Reaction, seated: boolean): Joints {
+  if (u < 0 || u > REACT.time) return base
+  const w = smooth(u / 0.15) * (1 - smooth((u - REACT.time + 0.3) / 0.3))
+  const s = Math.sin((u / REACT.time) * Math.PI)
+  let r: Joints
+  switch (kind) {
+    case 'jump':
+      r = seated
+        ? { ...base, armLZ: -2.3, armRZ: 2.3, foreL: -0.2, foreR: -0.2, headX: -0.2 }
+        : { ...base, lift: s * 0.35, armLZ: -2.4, armRZ: 2.4, foreL: -0.1, foreR: -0.1, legL: -0.5 * s, shinL: 0.9 * s, legR: -0.5 * s, shinR: 0.9 * s }
+      break
+    case 'wave':
+      r = { ...base, armRX: -0.3, armRY: 0, armRZ: 2.5, foreR: -0.4 + Math.sin(u * 14) * 0.45, headY: 0, headX: -0.1 }
+      break
+    case 'surprised':
+      r = { ...base, torsoX: -0.2, headX: -0.25, armLZ: -1.2, armRZ: 1.2, armLX: -0.6, armRX: -0.6, foreL: -0.4, foreR: -0.4, lift: seated ? base.lift : s * 0.08 }
+      break
+    case 'shrug':
+      r = { ...base, armLZ: -0.6, armRZ: 0.6, armLX: -0.4, armRX: -0.4, foreL: -1.7, foreR: -1.7, headX: 0.15, headY: Math.sin(u * 4) * 0.3, torsoZ: 0.05 }
+      break
+  }
+  return mix(base, r, w)
+}
+
+/** The pose of person `i` at scene time `now`, with a click reaction on top. */
 export function poseOf(c: Crowd, i: number, now: number): Pose {
+  const pose = basePose(c, i, now)
+  const p = c.people[i]!
+  const u = now - p.reactAt
+  if (!(u >= 0 && u <= REACT.time)) return pose
+  const seated = p.task === 'type' || p.task === 'sitDown' || p.task === 'standUp'
+  const { at, yaw, ...j } = pose
+  return { at, yaw, ...reacting(j, u, p.react, seated) }
+}
+
+/** The pose of person `i` at scene time `now` (without a click reaction). */
+function basePose(c: Crowd, i: number, now: number): Pose {
   const p: Person = c.people[i]!
   const spot = c.spots[p.spot]!
   const t = now + p.phase * 3

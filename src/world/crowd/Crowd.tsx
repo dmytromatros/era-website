@@ -3,6 +3,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { BODY, EYES } from '@/actors/rig'
 import { useTheme } from '@/theme/store'
 import type { WorldLayout } from '../layout'
@@ -11,9 +12,11 @@ import { useQualitySettings } from '../quality'
 import { useStylePreset } from '../style'
 import { applyToon } from '../toonMaterial'
 import { callAttention, cameraStill } from './attention'
-import { burstTime, CROWD, crowdSpots, JOLT, MEET, meetTime, newCrowd, stepCrowd } from './crowdModel'
+import { burstTime, CROWD, crowdSpots, JOLT, MEET, meetTime, newCrowd, poke, stepCrowd } from './crowdModel'
+import { useExperience } from '@/experience/store'
 import { onSpinningChair, poseOf } from './crowdPose'
 import { chairKey, chairTurns } from '../physics/chairSpin'
+import { crowdColliders, MAX_CROWD_COLLIDERS } from '../physics/protocol'
 import { floorOptions, pickFloorGroups } from './floorModel'
 import { buildNavGrid } from './navGrid'
 import type { PropSpot, StopExhibit } from '../physics/propsModel'
@@ -27,9 +30,11 @@ import type { PropSpot, StopExhibit } from '../physics/propsModel'
  *   fourth — 4 draw calls for the whole crowd, however many people;
  * - the same shader programs as the office's own instanced meshes (no new program);
  * - a person off camera is not posed (rule 35): their boxes are collapsed once and skipped;
- * - simpler than a character (no IK, springs, accessories, badges or click reactions; square
- *   head and body). Built for people away from the camera — since round 2 some stand on the
- *   route's floor too (floorModel.ts), a few metres from it: there the difference can show.
+ * - simpler than a character (no IK, springs, accessories or badges). Built for people away from
+ *   the camera; since some stand on the route's floor (floorModel.ts), a few metres from it, they
+ *   got the characters' rounded torso and head (two more instanced meshes, +2 draw calls, ~4k
+ *   triangles for 20), click reactions, and solid capsules for the props (physics/protocol.ts
+ *   `crowdColliders`; balls flew through them before).
  * - E2b: the meeting chart's bars (extra lit instances after the people's) and the sleeper's
  *   "Zzz" (extra dark instances): no extra draw calls.
  */
@@ -71,6 +76,9 @@ interface Skeleton {
   dark: THREE.Object3D[]
   /** The phone (in the right hand, shown only while pacing on it). */
   phone: THREE.Object3D
+  /** Rounded torso and head, like the characters' (their own instanced meshes, unscaled). */
+  torsoBox: THREE.Object3D
+  headBox: THREE.Object3D
 }
 
 /** The same proportions as a character (src/actors/Actor.tsx), as boxes to copy matrices from. */
@@ -105,7 +113,10 @@ function skeleton(): Skeleton {
   const [legL, shinL, footL] = leg(-FOOT_X)
   const [legR, shinR, footR] = leg(FOOT_X)
   const torso = group(root, [0, BODY.hipY, 0])
-  boxAt(torso, [0, 0.32, 0], [0.6, 0.64, 0.34], 'shirt')
+  // Rounded like the characters' (the geometry has the size: no scale).
+  const torsoBox = new THREE.Object3D()
+  torsoBox.position.set(0, 0.32, 0)
+  torso.add(torsoBox)
   const arm = (side: -1 | 1) => {
     const upper = BODY.upperArm + 0.01
     const lower = 0.49 - BODY.upperArm + OVERLAP
@@ -122,7 +133,9 @@ function skeleton(): Skeleton {
   boxAt(foreR, [-0.08, -0.29, 0.03], [0.035, 0.17, 0.09], 'eye')
   const phone = dark[dark.length - 1]!
   const head = group(torso, [0, BODY.neckY, 0])
-  boxAt(head, [0, 0.25, 0], [0.5, 0.5, 0.46], 'skin')
+  const headBox = new THREE.Object3D()
+  headBox.position.set(0, 0.25, 0)
+  head.add(headBox)
   // Hair clearly bigger than the head (≥ 3 cm each side): the full characters' rounded heads
   // stand off a 1 cm overhang, the crowd's square ones do not — seen from 10–20 m the two
   // surfaces fought for depth and the hair flickered (Dima 2026-11-16: "the hair glitches").
@@ -130,14 +143,21 @@ function skeleton(): Skeleton {
   boxAt(head, [0, 0.33, -0.235], [0.56, 0.32, 0.08], 'hair')
   for (const x of [-0.1, 0.1]) boxAt(head, [x, EYES.y, EYES.z], [0.07, 0.09, 0.02], 'eye')
   boxAt(head, [0, 0.13, 0.234], [0.1, 0.025, 0.02], 'eye')
-  return { root, torso, head, armL, armR, foreL, foreR, legL, legR, shinL, shinR, footL, footR, lit, dark, phone }
+  return { root, torso, head, armL, armR, foreL, foreR, legL, legR, shinL, shinR, footL, footR, lit, dark, phone, torsoBox, headBox }
 }
 
 const BOX = new THREE.BoxGeometry(1, 1, 1)
+// The characters' torso and head are drei RoundedBoxes (Actor.tsx): the same sizes and radii here,
+// 1 segment per corner (108 triangles each; 2 segments looked the same from a few metres and cost
+// ~12k triangles for 20 people instead of ~4k).
+const TORSO = new RoundedBoxGeometry(0.6, 0.64, 0.34, 1, 0.06)
+const HEAD = new RoundedBoxGeometry(0.5, 0.5, 0.46, 1, 0.07)
 const SHADOW = new THREE.CircleGeometry(0.42, 24).rotateX(-Math.PI / 2)
 const PUFF = new THREE.IcosahedronGeometry(0.5, 1)
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0)
 const noRaycast = () => null
+/** Tasks in which a person stands or walks (a capsule for the props). */
+const STANDING = new Set(['chat', 'pace', 'present', 'meet', 'walk'])
 
 /** Who is where is dealt anew on every page load (Dima: "different every time"). */
 const PAGE_SEED = Math.floor(Math.random() * 2 ** 31)
@@ -201,19 +221,35 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials])
 
   const body = useRef<THREE.InstancedMesh>(null)
+  const torsos = useRef<THREE.InstancedMesh>(null)
+  const heads = useRef<THREE.InstancedMesh>(null)
   const eyes = useRef<THREE.InstancedMesh>(null)
   const shadows = useRef<THREE.InstancedMesh>(null)
   const steam = useRef<THREE.InstancedMesh>(null)
 
   // Until the first frame poses them, nothing shows (an instance starts as a unit box at 0,0,0).
   useLayoutEffect(() => {
-    for (const mesh of [body.current, eyes.current, shadows.current, steam.current]) {
+    for (const mesh of [body.current, eyes.current, shadows.current, steam.current, torsos.current, heads.current]) {
       if (!mesh) continue
       for (let k = 0; k < mesh.count; k++) mesh.setMatrixAt(k, ZERO)
       mesh.instanceMatrix.needsUpdate = true
     }
     if (steam.current) steam.current.visible = false
   }, [people, litPer, darkPer, office, litCount, darkCount])
+
+  // The office's people as solids for the props (balls bounce off them): the sofa once, the
+  // standing / walking people every frame (below). Cleared when the crowd goes.
+  useEffect(() => {
+    crowdColliders.boxes = couch
+      ? [{ shape: 'box', pos: [couch.at[0], 0.42, couch.at[2]], half: [COUCH[0]!.size[0] / 2, 0.42, COUCH[0]!.size[2] / 2], yaw: couch.yaw }]
+      : []
+    crowdColliders.version++
+    return () => {
+      crowdColliders.people = []
+      crowdColliders.boxes = []
+      crowdColliders.version++
+    }
+  }, [couch])
 
   // The corridor sofa never moves: placed once (after the clean-up above).
   useLayoutEffect(() => {
@@ -244,6 +280,11 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
         mesh.setColorAt(i * litPer + k, c.set(hex))
       })
     })
+    model.crowd.people.slice(0, people).forEach((p, i) => {
+      torsos.current?.setColorAt(i, c.set(p.look.shirt))
+      heads.current?.setColorAt(i, c.set(p.look.skin))
+    })
+    for (const m of [torsos.current, heads.current]) if (m?.instanceColor) m.instanceColor.needsUpdate = true
     office.meeting.forEach((m, k) => m.bars.forEach((bar, j) => mesh.setColorAt(barsAt + k * BARS + j, c.set(BAR_COLOR[bar.color]))))
     if (couch) COUCH.forEach((_, k) => mesh.setColorAt(couchAt + k, c.set(world.office.fabricB)))
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
@@ -269,6 +310,30 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
     return { g, strokes: [stroke(0.5, 0, 1), stroke(0, Math.PI / 4, 1.3), stroke(-0.5, 0, 1)] }
   }, [])
   const headAt = useMemo(() => new THREE.Vector3(), [])
+  // Hit test for clicks: each person in view as two spheres (chest, head).
+  const pickPeople = useMemo(() => {
+    const hit = new THREE.Vector3()
+    const ball = new THREE.Sphere()
+    return function (this: THREE.InstancedMesh, raycaster: THREE.Raycaster, out: THREE.Intersection[]) {
+      for (let i = 0; i < skeletons.length && i < shown.current.length; i++) {
+        if (!shown.current[i]) continue
+        const sk = skeletons[i]!
+        let best: number | null = null
+        for (const [node, r] of [
+          [sk.torsoBox, 0.42],
+          [sk.headBox, 0.32],
+        ] as const) {
+          node.getWorldPosition(ball.center)
+          ball.radius = r
+          if (raycaster.ray.intersectSphere(ball, hit)) {
+            const d = raycaster.ray.origin.distanceTo(hit)
+            if (best === null || d < best) best = d
+          }
+        }
+        if (best !== null) out.push({ distance: best, point: raycaster.ray.at(best, new THREE.Vector3()), object: this, instanceId: i })
+      }
+    }
+  }, [skeletons])
   const extrasShown = useRef({ bars: [] as boolean[], zzz: false })
 
   // `?debug=1`: who is where, doing what, and where their heads are on screen (for checks).
@@ -312,11 +377,15 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
     const b = body.current
     const e = eyes.current
     const s = shadows.current
-    if (!b || !e || !s) return
+    const to = torsos.current
+    const he = heads.current
+    if (!b || !e || !s || !to || !he) return
     projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
     frustum.setFromProjectionMatrix(projView)
     let changed = false
     let seen = 0
+    const solids = crowdColliders.people
+    solids.length = 0
     for (let i = 0; i < people; i++) {
       const sk = skeletons[i]!
       let pose = poseOf(crowd, i, now)
@@ -327,6 +396,8 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
         const turning = chairTurns.get(chairKey(seat.at))
         if (turning) pose = onSpinningChair(pose, seat.at, turning.angle, turning.speed)
       }
+      // Standing or walking: a solid for the props (seated ones are behind desks and glass).
+      if (STANDING.has(person.task) && solids.length < MAX_CROWD_COLLIDERS * 3) solids.push(pose.at[0], pose.at[1], pose.at[2])
       sphere.center.set(pose.at[0], pose.at[1] + 0.9, pose.at[2])
       const visible = frustum.intersectsSphere(sphere)
       if (!visible) {
@@ -335,6 +406,8 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
           for (let k = 0; k < litPer; k++) b.setMatrixAt(i * litPer + k, ZERO)
           for (let k = 0; k < darkPer; k++) e.setMatrixAt(i * darkPer + k, ZERO)
           s.setMatrixAt(i, ZERO)
+          to.setMatrixAt(i, ZERO)
+          he.setMatrixAt(i, ZERO)
           shown.current[i] = false
           changed = true
         }
@@ -362,6 +435,8 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       sk.footR.rotation.set(-(pose.legR + pose.shinR), 0, 0)
       sk.root.updateMatrixWorld(true)
       sk.lit.forEach((part, k) => b.setMatrixAt(i * litPer + k, part.node.matrixWorld))
+      to.setMatrixAt(i, sk.torsoBox.matrixWorld)
+      he.setMatrixAt(i, sk.headBox.matrixWorld)
       const onPhone = crowd.people[i]!.task === 'pace'
       sk.dark.forEach((node, k) => e.setMatrixAt(i * darkPer + k, node === sk.phone && !onPhone ? ZERO : node.matrixWorld))
       // A soft shadow on the floor, smaller while they are in the air (none lying on a sofa).
@@ -443,12 +518,10 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
     })
     tmp.rotation.order = 'XYZ'
     if (changed) {
-      b.instanceMatrix.needsUpdate = true
-      e.instanceMatrix.needsUpdate = true
-      s.instanceMatrix.needsUpdate = true
+      for (const m of [b, e, s, to, he]) m.instanceMatrix.needsUpdate = true
     }
     // Nobody in view: no draw calls at all.
-    b.visible = e.visible = s.visible = seen > 0
+    b.visible = e.visible = s.visible = to.visible = he.visible = seen > 0
 
     // The coffee machines' steam: a burst of puffs, only while it plays.
     const st = steam.current
@@ -496,6 +569,27 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
   return (
     <group>
       <instancedMesh key={`b${litCount}`} ref={body} args={[BOX, materials.body, litCount]} frustumCulled={false} raycast={noRaycast} />
+      <instancedMesh
+        key={`t${people}`}
+        ref={torsos}
+        args={[TORSO, materials.body, Math.max(people, 1)]}
+        frustumCulled={false}
+        // Clickable people (E2a): our own hit test — a sphere round each one's chest and head.
+        raycast={pickPeople}
+        // Only once the 3D world has taken over (rule 18).
+        onClick={(ev) => {
+          if (!useExperience.getState().handedOver || ev.instanceId === undefined) return
+          ev.stopPropagation()
+          poke(model.crowd, ev.instanceId, clock.elapsedTime)
+        }}
+        onPointerOver={(ev) => {
+          if (!useExperience.getState().handedOver) return
+          ev.stopPropagation()
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={() => (document.body.style.cursor = '')}
+      />
+      <instancedMesh key={`h${people}`} ref={heads} args={[HEAD, materials.body, Math.max(people, 1)]} frustumCulled={false} raycast={noRaycast} />
       <instancedMesh key={`e${darkCount}`} ref={eyes} args={[BOX, materials.eye, darkCount]} frustumCulled={false} raycast={noRaycast} />
       <instancedMesh key={`s${people}`} ref={shadows} args={[SHADOW, materials.shadow, people]} frustumCulled={false} raycast={noRaycast} />
       {office.coffee.length > 0 && (

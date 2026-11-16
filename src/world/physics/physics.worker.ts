@@ -7,7 +7,7 @@
  * motion is the same on every device; the page interpolates between the last two poses.
  */
 import RAPIER from '@dimforge/rapier3d-compat'
-import { POSE_FLOATS, type ActorCollider, type FromWorker, type ToWorker } from './protocol'
+import { CROWD_CAPSULE, MAX_CROWD_COLLIDERS, POSE_FLOATS, type ActorCollider, type FromWorker, type ToWorker } from './protocol'
 import type { PropBody, StaticShape } from './propsModel'
 
 /** The camera's "body": props inside this radius are moved aside (no hard hit at flight speed). */
@@ -33,6 +33,23 @@ const bodyByCollider = new Map<number, number>()
 const actorByCollider = new Map<number, number>()
 const lastHit: number[] = []
 let prev = new Float32Array(0)
+/** The office's people (E2a): kinematic capsules moved to where they stand / walk; spares parked. */
+const crowd: RAPIER.RigidBody[] = []
+const crowdBoxes: RAPIER.Collider[] = []
+const PARKED = { x: 0, y: -100, z: 0 }
+
+function moveCrowd(w: RAPIER.World, people: number[]) {
+  const n = Math.min(MAX_CROWD_COLLIDERS, Math.floor(people.length / 3))
+  while (crowd.length < n) {
+    const rb = w.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(PARKED.x, PARKED.y, PARKED.z))
+    const half = CROWD_CAPSULE.height / 2 - CROWD_CAPSULE.radius
+    w.createCollider(RAPIER.ColliderDesc.capsule(half, CROWD_CAPSULE.radius).setTranslation(0, CROWD_CAPSULE.height / 2, 0).setRestitution(0.5), rb)
+    crowd.push(rb)
+  }
+  crowd.forEach((rb, i) =>
+    rb.setNextKinematicTranslation(i < n ? { x: people[i * 3]!, y: people[i * 3 + 1]!, z: people[i * 3 + 2]! } : PARKED),
+  )
+}
 
 const yawQuat = (yaw: number) => ({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
 
@@ -189,6 +206,18 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
       true,
     )
   }
+  if (m.crowdBoxes) {
+    for (const c of crowdBoxes) world.removeCollider(c, false)
+    crowdBoxes.length = 0
+    for (const s of m.crowdBoxes) {
+      crowdBoxes.push(
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(s.half[0], s.half[1], s.half[2]).setTranslation(s.pos[0], s.pos[1], s.pos[2]).setRotation(yawQuat(s.yaw)).setFriction(0.7).setRestitution(0.3),
+        ),
+      )
+    }
+  }
+  moveCrowd(world, m.crowd)
   const impacts: number[] = []
   const hits: number[] = []
   stepWorld(m.dt, m.camera, impacts, hits)

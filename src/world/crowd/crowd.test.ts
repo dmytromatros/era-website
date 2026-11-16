@@ -4,7 +4,7 @@ import { layoutRoute } from '../layout'
 import { blocked, buildOffice } from '../officeModel'
 import { routePlan } from '../route'
 import { buildNavGrid, clearLine, findPath, NAV, pathLength, walkable } from './navGrid'
-import { burstTime, chattersAt, CROWD, crowdSpots, hidden, MEET, meetTime, newCrowd, stepCrowd, type Attention, type View } from './crowdModel'
+import { burstTime, chattersAt, CROWD, crowdSpots, hidden, MEET, meetTime, newCrowd, poke, REACT, stepCrowd, type Attention, type View } from './crowdModel'
 import type { Vec3 } from '../layout'
 import { onSpinningChair, poseOf } from './crowdPose'
 import { FLOOR, floorOptions, pickFloorGroups } from './floorModel'
@@ -360,6 +360,32 @@ for (const [name, aspect] of [
         }
         expect(meetTime(crowd, 0, 10 + MEET.total + 0.1)).toBeNull()
       })
+    })
+
+    it('a click: reactions in turn, a shrug when clicked again and again; the sleeper wakes', () => {
+      const crowd = newCrowd(spots, 20, 1, 0, steam, office.meeting.map((m) => m.bars[0]!.base))
+      const i = crowd.people.findIndex((p) => p.task === 'chat')
+      const p = crowd.people[i]!
+      poke(crowd, i, 10)
+      expect(p.react).toBe('jump')
+      poke(crowd, i, 13)
+      expect(p.react).toBe('wave')
+      poke(crowd, i, 13.4)
+      poke(crowd, i, 13.8)
+      expect(p.react).toBe('shrug')
+      // The reaction shows, then fades without a jump.
+      const before = poseOf(crowd, i, 13.79)
+      let prev = before
+      for (let now = 13.8; now < 13.8 + REACT.time + 0.2; now += 1 / 60) {
+        const pose = poseOf(crowd, i, now)
+        for (const k of ['armLZ', 'armRZ', 'foreL', 'foreR', 'lift'] as const) expect(Math.abs(pose[k] - prev[k])).toBeLessThan(0.35)
+        prev = pose
+      }
+      const s = crowd.people.findIndex((q) => q.task === 'sleep')
+      if (s >= 0) {
+        poke(crowd, s, 20)
+        expect(crowd.people[s]!.bonkAt).toBe(20)
+      }
     })
 
     it('chatting never jumps between poses (speaker ↔ listener blend)', () => {

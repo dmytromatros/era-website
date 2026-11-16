@@ -22,7 +22,7 @@ import { QUALITY, useQuality } from '../quality'
 import type { Timing } from '../route'
 import { timeline } from '../timeline'
 import { StyledMaterial } from '../toonMaterial'
-import { POSE_FLOATS, type ActorCollider, type FromWorker, type ToWorker } from './protocol'
+import { crowdColliders, MAX_CROWD_COLLIDERS, POSE_FLOATS, type ActorCollider, type FromWorker, type ToWorker } from './protocol'
 import type { PropBody, StaticShape } from './propsModel'
 
 /** Live numbers for the X-ray panel. */
@@ -140,6 +140,8 @@ export function Physics({ bodies, statics, actors, actorKeys, wakeRail, timing, 
     awake: 0,
     sinceSent: 0,
     pushes: [] as { body: number; dv: [number, number, number]; point: [number, number, number] }[],
+    /** Which version of the crowd's still things the worker has. */
+    crowdVersion: 0,
     dirty: true,
     squash: bodies.map((): Squash => ({ x: 0, v: 0 })),
     puffs: Array.from({ length: PUFFS }, () => ({ at: new THREE.Vector3(), start: -Infinity, size: 0 })),
@@ -309,7 +311,11 @@ export function Physics({ bodies, statics, actors, actorKeys, wakeRail, timing, 
           camera: [camera.position.x, camera.position.y, camera.position.z],
           pushes: s.pushes,
           buffer: s.buffer,
+          // The office's people (E2a) as solids: balls bounce off them, not through.
+          crowd: crowdColliders.people.slice(0, MAX_CROWD_COLLIDERS * 3),
+          ...(crowdColliders.version !== s.crowdVersion ? { crowdBoxes: crowdColliders.boxes } : {}),
         }
+        s.crowdVersion = crowdColliders.version
         s.worker.postMessage(msg, [s.buffer.buffer])
         s.buffer = null
         s.inFlight = true

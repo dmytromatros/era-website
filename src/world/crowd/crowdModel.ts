@@ -114,6 +114,33 @@ export interface Person {
   length: number
   /** Desk: when the last / current head-bang started; sofa: the last / current jolt awake. */
   bonkAt: number
+  /** A click on them (E2a): when the reaction started, which one, and recent clicks (scene time). */
+  reactAt: number
+  react: Reaction
+  clicks: number[]
+  /** Clicks so far (the reactions go round in turn). */
+  pokes: number
+}
+
+/** What a person does when clicked: in turn, and a shrug when clicked again and again. */
+export type Reaction = 'jump' | 'wave' | 'surprised' | 'shrug'
+export const REACT = { time: 1.3, order: ['jump', 'wave', 'surprised'] as const, annoyedAfter: 3, window: 2.5 } as const
+
+/**
+ * A click on person `i`: the sleeper jerks awake (their gag); anyone else reacts — in turn
+ * jump, wave, surprised; a shrug after a few quick clicks (like the characters, C1).
+ */
+export function poke(c: Crowd, i: number, now: number) {
+  const p = c.people[i]
+  if (!p) return
+  if (p.task === 'sleep') {
+    if (!(now - p.bonkAt < JOLT.total)) p.bonkAt = now
+    return
+  }
+  p.clicks = [...p.clicks.filter((t) => now - t < REACT.window), now]
+  p.pokes++
+  p.react = p.clicks.length >= REACT.annoyedAfter ? 'shrug' : REACT.order[(p.pokes - 1) % REACT.order.length]!
+  p.reactAt = now
 }
 
 /** Where the camera is and looks (xz, normalised), for gags that play only in view. */
@@ -264,6 +291,10 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
       path: [],
       length: 0,
       bonkAt: -Infinity,
+      reactAt: -Infinity,
+      react: 'jump',
+      clicks: [],
+      pokes: 0,
     })
   }
   const quiet = {
