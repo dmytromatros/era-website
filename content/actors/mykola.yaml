@@ -1,0 +1,11 @@
+# Waves at the CTA on the home page (Dima, 2026-11-16: "Mykola" was meant for the one at the
+# computer, Kit, but his badge hides behind the laptop — "then someone else"). Looks like Leo;
+# Leo on Contacts stays Leo.
+name: Mykola
+role: Client partner
+palette: { skin: "#e0ac85", shirt: "#ffb703", pants: "#023047", accent: "#219ebc", hair: "#2d1b10" }
+accessories: [badge]
+# Click / tap: played in turn; `annoyed` after a few quick clicks (default: shrug 😤).
+reactions:
+  - { move: dance, emoji: "🤝" }
+  - { move: jump, emoji: "🎉" }

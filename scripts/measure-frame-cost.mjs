@@ -24,7 +24,7 @@ const cleanup = () => { try { chrome.kill('SIGKILL') } catch {} ; try { rmSync(p
 process.on('exit', cleanup)
 for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => process.exit(1))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-const killer = setTimeout(() => { console.error('timeout'); process.exit(2) }, 240000)
+const killer = setTimeout(() => { console.error('timeout'); process.exit(2) }, 540000)
 
 try {
   let target
@@ -44,15 +44,36 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: +W, height: +H, deviceScaleFactor: 1, mobile: +W < 768 })
   // Rail points in scroll units (entrance = 1.6, src/world/timeline.ts ENTRANCE; the D1 hold is off).
   const points = [2.9, 10.5, 16.2, 18.8, 21.3]
+  const TOTAL = 22.6
+  const scrollTo = (u) => evaluate(`(() => { const m = document.documentElement.scrollHeight - innerHeight; scrollTo(0, m * ${u} / ${TOTAL}) })()`)
+  // The entrance is a cutscene (D3, CLAUDE.md rule 41): it holds the page until the coffee is
+  // answered. Play it through like a visitor — scroll into the film, say "No, thanks" — before
+  // going to the rail points, or the first points are measured mid-cutscene (as they were from
+  // 2026-11-10 to 2026-11-16).
+  const playEntrance = async () => {
+    await scrollTo(0.3)
+    let seen = false
+    for (let i = 0; i < 150; i++) {
+      await sleep(1000)
+      const on = await evaluate(`(() => {
+        const no = [...document.querySelectorAll('button')].find((b) => /No, thanks/.test(b.textContent))
+        if (no) no.click()
+        return document.documentElement.hasAttribute('data-cutscene')
+      })()`)
+      if (on) seen = true
+      else if (seen) return 'played'
+    }
+    return seen ? 'timeout' : 'no cutscene'
+  }
   const results = {}
   for (const q of ['high', 'medium', 'low']) {
     await send('Page.navigate', { url: `http://localhost:3000/en?debug=1&quality=${q}` })
     await sleep(9000)
-    results[q] = {}
+    results[q] = { entrance: await playEntrance() }
     for (const u of points) {
-      await evaluate(`(() => { const m = document.documentElement.scrollHeight - innerHeight; scrollTo(0, m * ${u} / 22.6) })()`)
+      await scrollTo(u)
       await sleep(5000)
-      results[q][u] = await evaluate(`(document.querySelector('[data-debug-stats]')?.textContent || 'none') + ' | handover=' + document.documentElement.hasAttribute('data-handover')`)
+      results[q][u] = await evaluate(`(document.querySelector('[data-debug-stats]')?.textContent || 'none') + ' | handover=' + document.documentElement.hasAttribute('data-handover') + ' | at=' + (scrollY / (document.documentElement.scrollHeight - innerHeight) * ${TOTAL}).toFixed(2)`)
     }
   }
   console.log(JSON.stringify(results, null, 1))

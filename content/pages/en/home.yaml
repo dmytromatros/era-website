@@ -11,7 +11,7 @@ blocks:
     tags: [WEBSITES, INTERACTIVES, 2D|3D, EXPLAINERS, WEBAPPS, UX|UI]
     helpers:
       - target: heading
-        actor: max
+        actor: bohdan
         pose: holding
         lines:
           - Careful, this headline is heavy — it carries the whole brand.
@@ -79,7 +79,7 @@ blocks:
     action: { label: Apply now, href: /contacts }
     helpers:
       - target: action
-        actor: leo
+        actor: mykola
         pose: waving
         lines:
           - Hey! This is the button. You know what to do.
