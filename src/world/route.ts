@@ -92,8 +92,10 @@ export function planTiming(plan: RoutePlan): Timing {
     if (item.kind === 'waypoint') return { units: WAYPOINT_UNITS, dwell: 0.5 }
     stopRail[item.stopIndex] = 2 + i // rail: [start, entered, ...items]
     if (item.key) keyRail.push(2 + i)
-    // Arriving at a key stop: slow down a lot. Passing a minor one: barely.
-    return item.key ? { units: KEY_UNITS, dwell: 0.85 } : { units: PASS_UNITS, dwell: 0.35 }
+    // Arriving at a key stop: slow down. Passing a minor one: barely. (Key dwell 0.85 until
+    // 2026-11-16: at a steady scroll the camera crawled at 15% of its pace near every key stop
+    // and looked frozen; letting go near a stop, the magnet — settleModel.ts — frames it exactly.)
+    return item.key ? { units: KEY_UNITS, dwell: 0.6 } : { units: PASS_UNITS, dwell: 0.35 }
   })
   return { segments, stopRail, keyRail }
 }
