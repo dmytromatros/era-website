@@ -6,6 +6,8 @@ import * as THREE from 'three'
 import { PORTAL_TIMING } from '@/experience/portal'
 import { live, useExperience } from '@/experience/store'
 import { accentAt, cameraFocus, dollyFov, dollyPosition } from './cinema'
+import { ATTENTION, attention, attentionWeight, cameraStill, glanceZoom, STILL_AFTER } from './crowd/attention'
+import { cutsceneNow } from './cutscene/cutsceneModel'
 import { ZERO_KICK, entranceBreak, kickAt } from './firstPerson/breakModel'
 import { cameraBody, crackFrame } from './firstPerson/crack'
 import { glanceYaw } from './firstPerson/handsModel'
@@ -36,6 +38,9 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
   const tmpTarget = useMemo(() => new THREE.Vector3(), [])
   // Walking (D2): the gait state and how much walking is allowed (smoothed).
   const walk = useMemo(() => ({ state: newWalk(), weight: 0, rail: new THREE.Vector3() }), [])
+  // A glance at a gag (E2a, crowd/attention.ts): how much, smoothed so a gate closing mid-glance
+  // (arriving at a key stop) eases it out instead of snapping back.
+  const glance = useMemo(() => ({ weight: 0, at: new THREE.Vector3(), railLook: new THREE.Vector3() }), [])
   // ?debug=1: the walk's numbers for tuning (window.__eraWalk).
   useLayoutEffect(() => {
     if (new URLSearchParams(location.search).get('debug') !== '1') return
@@ -87,14 +92,33 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     const kick = kickAt(cf.since, entranceBreak.side, cf.look, cf.heal, glanceYaw({ aspect, fov: ENTRANCE_GEOMETRY.fov }))
     const dolly = target ? dollyFov(t.entrance) : ENTRANCE_GEOMETRY.fov
     if (target && dolly !== ENTRANCE_GEOMETRY.fov) tmpPos.set(...dollyPosition([tmpPos.x, tmpPos.y, tmpPos.z], target, dolly))
+
+    // A glance at a gag the visitor walks past (E2a): look over, zoom in, pull focus — and back.
+    // Between stops only: never at a key stop (its frame and the magnet), in the entrance, the
+    // cutscene or a portal. Time-based from the gag's start, like the crack (rules 1, 27).
+    const { portal, arrivedVia } = useExperience.getState()
+    const accent = accentAt(t.railIndex, timing.keyRail)
+    const free = t.entrance >= 1 && portal.phase === 'idle' && (cutsceneNow.phase === 'idle' || cutsceneNow.phase === 'done')
+    // Standing or scrolling? (From the shown progress, rule 1.) Scrolling again mid-glance eases it out.
+    if (Math.abs(live.progress - cameraStill.last) > 1e-5 || !Number.isFinite(cameraStill.last)) cameraStill.since = clock.elapsedTime
+    cameraStill.last = live.progress
+    cameraStill.still = clock.elapsedTime - cameraStill.since >= STILL_AFTER
+    const want = free && cameraStill.still ? attentionWeight(clock.elapsedTime) * (1 - accent) : 0
+    glance.weight += (want - glance.weight) * (1 - Math.exp(-Math.min(delta, 0.1) * 10))
+    if (glance.weight < 1e-3) glance.weight = 0
+    glance.railLook.copy(tmpLook)
+    if (glance.weight > 0) {
+      glance.at.set(...attention.at)
+      tmpLook.lerp(glance.at, glance.weight * ATTENTION.look)
+    }
+
     // The fov punch is NOT compensated: the world warps for a moment.
-    const fov = dolly + kick.fov
+    const fov = dolly + kick.fov - glance.weight * glanceZoom
     if (camera.fov !== fov) {
       camera.fov = fov
       camera.updateProjectionMatrix()
     }
 
-    const { portal, arrivedVia } = useExperience.getState()
     const age = performance.now() - portal.since
 
     // Diving into a door: pull the camera towards it and look straight in.
@@ -124,7 +148,8 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     walk.weight += (allowed - walk.weight) * (1 - Math.exp(-Math.min(delta, 0.1) * 4))
     const w = stepWalk(walk.state, {
       position: [walk.rail.x, walk.rail.y, walk.rail.z],
-      look: [tmpLook.x, tmpLook.y, tmpLook.z],
+      // The rail's own look (a glance turns the head, not the walk).
+      look: [glance.railLook.x, glance.railLook.y, glance.railLook.z],
       dt: delta,
       flights: layout.architecture.flights,
       weight: walk.weight,
@@ -148,8 +173,11 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
       camera.rotateX(kick.pitch)
       camera.rotateZ(kick.roll)
     }
-    cameraFocus.distance = tmpPos.distanceTo(tmpLook)
-    cameraFocus.accent = accentAt(t.railIndex, timing.keyRail)
+    // Focus: on what the rail looks at — or, during a glance, pulled to the gag, with the
+    // background blur on just for that moment (B3 blurs only at key stops otherwise).
+    const railFocus = tmpPos.distanceTo(glance.railLook)
+    cameraFocus.distance = glance.weight > 0 ? THREE.MathUtils.lerp(railFocus, tmpPos.distanceTo(glance.at), glance.weight) : railFocus
+    cameraFocus.accent = Math.max(accent, glance.weight)
   })
 
   return null

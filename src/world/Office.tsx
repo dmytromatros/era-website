@@ -8,7 +8,7 @@ import type { Theme } from '@/theme/tokens'
 import { useTheme, useThemeStore } from '@/theme/store'
 import type { Box } from './layout'
 import type { Chair, Mat, Office as OfficeData, Prim } from './officeModel'
-import { kickSpin, spin, stepSpin, type Spin } from './physics/chairSpin'
+import { chairKey, chairTurns, kickSpin, spin, stepSpin, type Spin } from './physics/chairSpin'
 import { useQualitySettings } from './quality'
 import { createScreenMaterial } from './screenMaterial'
 import { useStylePreset } from './style'
@@ -131,7 +131,13 @@ function Chairs({
     for (const [ci, s] of spins.current) {
       const moving = stepSpin(s, delta)
       place(mesh, ci, s.angle)
-      if (!moving) spins.current.delete(ci)
+      // Shared, so whoever sits on it turns too (only the page's own office spins).
+      const key = chairKey(chairs[ci]!.pivot)
+      if (moving) chairTurns.set(key, s)
+      else {
+        spins.current.delete(ci)
+        chairTurns.delete(key)
+      }
     }
     mesh.instanceMatrix.needsUpdate = true
   })

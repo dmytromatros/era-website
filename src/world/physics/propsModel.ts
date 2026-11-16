@@ -103,7 +103,7 @@ export function distanceToRail(rail: Vec3[], x: number, z: number): number {
 }
 
 /** Inside a ground-level stretch of the route, away from its edges (partitions), stairs and mezzanine ground. */
-function onRouteFloor(layout: WorldLayout, x: number, z: number, r: number): boolean {
+export function onRouteFloor(layout: WorldLayout, x: number, z: number, r: number): boolean {
   const { clear, stairs, mezzanines } = layout.architecture
   const local = (f: { origin: Vec3; heading: number }) => {
     const dx = x - f.origin[0]

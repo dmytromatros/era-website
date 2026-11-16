@@ -5,7 +5,8 @@
  * - shell: ceiling with light panels, columns on a grid, a perimeter of tall windows;
  * - corridor sides become glass partitions (frosted band low, clear glass above);
  * - stairs lead to a mezzanine on pillars with a glass railing;
- * - furniture (desk clusters, plants, shelves, sofas) fills free floor beside the path.
+ * - furniture (desk clusters, plants, shelves, sofas) fills free floor beside the path;
+ * - a coffee corner or two (E2a): where the office's people meet (world/crowd).
  *
  * Everything is made of primitives (boxes, cylinders, balls) in a few materials, so the renderer
  * can draw all of it with a handful of instanced meshes. Nothing may stand on `clear` floor.
@@ -46,6 +47,17 @@ export interface Chair {
   prims: Prim[]
 }
 
+/** A coffee corner (E2a): the machine's spout, and where two people stand to chat. */
+export interface CoffeeCorner {
+  /** Floor point under the counter's centre and the yaw its front faces (three.js yaw). */
+  at: Vec3
+  yaw: number
+  /** Top of the machine (the steam bursts from there). */
+  steam: Vec3
+  /** Where two people stand, facing each other across the corner (yaw = their facing). */
+  spots: { at: Vec3; yaw: number }[]
+}
+
 export interface Office {
   solid: Prim[]
   glass: Box[]
@@ -62,6 +74,8 @@ export interface Office {
   keepOff: ClearRect[]
   /** Swivel chairs (their seats are not in `solid`). */
   chairs: Chair[]
+  /** Coffee corners (E2a), 0–2. */
+  coffee: CoffeeCorner[]
 }
 
 export const OFFICE = {
@@ -95,6 +109,64 @@ export function blocked(x: number, z: number, r: number, clear: ClearRect[]): bo
     const across = dx * rt[0] + dz * rt[2]
     return along >= c.from - r && along <= c.to + r && Math.abs(across) <= c.half + r
   })
+}
+
+/** Does the floor segment a → b cross a (thin, upright) layout box, seen from above? */
+export function crosses(a: Vec3, b: Vec3, box: Box): boolean {
+  // Into the box's own frame (its mesh turns by −yaw, officeModel's Boxes).
+  const t = -box.yaw
+  const c = Math.cos(t)
+  const s = Math.sin(t)
+  const local = (p: Vec3) => {
+    const dx = p[0] - box.center[0]
+    const dz = p[2] - box.center[2]
+    return [c * dx - s * dz, s * dx + c * dz] as const
+  }
+  const [ax, az] = local(a)
+  const [bx, bz] = local(b)
+  const hx = box.size[0] / 2
+  const hz = box.size[2] / 2
+  // Liang–Barsky against the box's footprint.
+  let t0 = 0
+  let t1 = 1
+  const dx = bx - ax
+  const dz = bz - az
+  for (const [p, q] of [
+    [-dx, ax + hx],
+    [dx, hx - ax],
+    [-dz, az + hz],
+    [dz, hz - az],
+  ] as const) {
+    if (p === 0) {
+      if (q < 0) return false
+      continue
+    }
+    const r = q / p
+    if (p < 0) t0 = Math.max(t0, r)
+    else t1 = Math.min(t1, r)
+    if (t0 > t1) return false
+  }
+  return true
+}
+
+/**
+ * How close a stop sees floor point `p` from (m): it must be within the camera's view at that
+ * stop (±35° around where it looks). Behind a frosted glass band it counts as twice as far:
+ * seen, but paler (excluding it emptied every glass corridor — Dima 2026-11-16: "behind the
+ * glass there is almost nobody"). ∞ = no stop sees it.
+ */
+export function seenFrom(p: Vec3, stations: WorldLayout['stations'], frosted: Box[]): number {
+  let best = Infinity
+  for (const st of stations) {
+    const lx = st.focus[0] - st.viewpoint[0]
+    const lz = st.focus[2] - st.viewpoint[2]
+    const px = p[0] - st.viewpoint[0]
+    const pz = p[2] - st.viewpoint[2]
+    const d = Math.hypot(px, pz)
+    if (d <= 0 || d >= best || (lx * px + lz * pz) / (Math.hypot(lx, lz) * d) <= Math.cos(0.6)) continue
+    best = Math.min(best, frosted.some((f) => crosses(st.viewpoint, p, f)) ? d * 2 : d)
+  }
+  return best
 }
 
 /** Transform primitives given in a prop's local space (+z = its front) into the world. */
@@ -168,6 +240,25 @@ function shelf(seed: number): Prim[] {
     ...books,
   ]
 }
+
+/** Counter with a coffee machine and two cups. Footprint ≈ 1.4 × 0.7; front = +z. */
+function coffeeCounter(): Prim[] {
+  return [
+    box([0, 0.45, 0], [1.3, 0.9, 0.6], 'wood'),
+    box([0, 0.92, 0], [1.36, 0.04, 0.66], 'woodDark'),
+    box([-0.28, 1.17, -0.05], [0.36, 0.46, 0.34], 'metal'),
+    box([-0.28, 1.25, 0.125], [0.24, 0.12, 0.01], 'frame'),
+    box([-0.28, 1.0, 0.1], [0.06, 0.07, 0.06], 'frame'),
+    cyl([0.22, 0.99, 0.08], 0.08, 0.1, 'wall'),
+    cyl([0.38, 0.99, -0.1], 0.08, 0.1, 'wall'),
+  ]
+}
+/** Where the two people chat, in the counter's space: in front of it, facing each other. */
+const COFFEE_SPOTS: { at: Vec3; yaw: number }[] = [
+  { at: [-0.5, 0, 1.45], yaw: Math.PI / 2 - 0.35 },
+  { at: [0.5, 0, 1.45], yaw: -Math.PI / 2 + 0.35 },
+]
+const COFFEE_STEAM: Vec3 = [-0.28, 1.42, -0.05]
 
 function lounge(): Prim[] {
   return [
@@ -307,6 +398,42 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
     }
   }
 
+  // ---- coffee corners (E2a), after the columns and with their own random stream: the rest
+  // of the office stays exactly as it was ----
+  const coffee: CoffeeCorner[] = []
+  const randCoffee = seeded(seed * 31 + 7)
+  const free = (x: number, z: number, r: number) =>
+    fits(x, z, r) && columns.every((c) => Math.hypot(c.x - x, c.z - z) > c.r + r + 0.3)
+  const candidates: { at: Vec3; yaw: number }[] = []
+  clear.forEach((c, ci) => {
+    if (c.frame.level > 0 || ci === 0) return
+    for (let along = c.from + 3.8; along < c.to - 1.5; along += 4.6) {
+      for (const s of [-1, 1]) {
+        // Side-on to the path: the front faces along it, so the two chat in profile to the camera.
+        // Next to the path between the desk clusters if there is room, else behind them.
+        const fw = forward(c.frame.heading)
+        for (const out of [2.2, 6.2]) candidates.push({ at: inFrame(c.frame, along, s * (c.half + out)), yaw: Math.atan2(fw[0], fw[2]) })
+      }
+    }
+  })
+  // Where the camera stops and looks: a corner in view of a stop (not behind frosted glass)
+  // comes first, the closer the better, so the gag is seen; the rest in random order.
+  const order = candidates.map((c) => ({ c, seen: seenFrom(c.at, layout.stations, frosted), r: randCoffee() })).sort((a, b) => a.seen - b.seen || a.r - b.r)
+  candidates.length = 0
+  candidates.push(...order.map((o) => o.c))
+  while (candidates.length && coffee.length < 2) {
+    const { at, yaw } = candidates.shift()!
+    const c = Math.cos(yaw)
+    const sn = Math.sin(yaw)
+    const toWorld = (v: Vec3): Vec3 => [at[0] + v[0] * c + v[2] * sn, at[1] + v[1], at[2] - v[0] * sn + v[2] * c]
+    const spots = COFFEE_SPOTS.map((sp) => ({ at: toWorld(sp.at), yaw: sp.yaw + yaw }))
+    if (!free(at[0], at[2], 0.8) || !spots.every((sp) => free(sp.at[0], sp.at[2], 0.45))) continue
+    if (coffee.some((k) => Math.hypot(k.at[0] - at[0], k.at[2] - at[2]) < 12)) continue
+    placed.push({ x: at[0], z: at[2], r: 0.8 })
+    solid.push(...place(coffeeCounter(), at, yaw))
+    coffee.push({ at, yaw, steam: toWorld(COFFEE_STEAM), spots })
+  }
+
   // ---- ceiling light panels ----
   const lg = OFFICE.lightGrid
   for (let x = bounds.minX + lg / 2; x < bounds.maxX; x += lg) {
@@ -358,5 +485,6 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
     ],
     keepOff,
     chairs: [...chairsByPivot.values()],
+    coffee,
   }
 }

@@ -28,6 +28,14 @@ export interface Spin {
 
 export const spin = (): Spin => ({ angle: 0, speed: 0, target: null })
 
+/**
+ * The seats spinning right now, by their stem's floor point (`chairKey`): written by <Office>'s
+ * chairs while one moves, removed at rest. Whoever sits on it (the office's people, E2a) turns
+ * with it — Dima 2026-11-16: "the chair spins and the guy doesn't".
+ */
+export const chairTurns = new Map<string, Spin>()
+export const chairKey = (pivot: readonly [number, number, number]) => `${pivot[0].toFixed(2)},${pivot[2].toFixed(2)}`
+
 /** A click on a seat: `lever` −1…1 is where it was hit across the seat (sign = direction). */
 export function kickSpin(s: Spin, lever: number) {
   const dir = lever === 0 ? 1 : Math.sign(lever)

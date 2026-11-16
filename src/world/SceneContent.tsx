@@ -19,6 +19,7 @@ import { Hands } from './firstPerson/Hands'
 import { Shards } from './firstPerson/Shards'
 import { CoffeeScene } from './coffee/CoffeeScene'
 import { Cutscene } from './cutscene/Cutscene'
+import { LazyCrowd } from './crowd/LazyCrowd'
 import { Settle } from './Settle'
 import { HeroTransit, type TransitItem } from './HeroTransit'
 import type { KineticOptions } from './KineticText'
@@ -145,7 +146,9 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       // Rapier loads about two rail points before the first stop with a prop.
       wakeRail: spots.length ? Math.min(...spots.map((sp) => timing.stopRail[sp.station]!)) - 2.5 : Infinity,
     }
-    return { models, layout, transit, office, physics }
+    // People standing on the route's floor (E2a) keep clear of the same exhibits, helpers and props.
+    const floor = { exhibits, props: spots, skip, aspect: size.width / size.height }
+    return { models, layout, transit, office, physics, floor }
   }, [measured, plan, timing, page, k, size, nav, currentHref, style.seed, actors])
 
   if (!world) return <Membrane />
@@ -175,6 +178,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       )}
       <Membrane />
       <Office data={world.office} accent={style.accent} />
+      {/* The office's own people (E2a): typing, chatting by the coffee, walking about. */}
+      <LazyCrowd office={world.office} layout={world.layout} floor={world.floor} />
       {/* Floating shapes are off inside the office (perPoint 0); raise it to bring them back. */}
       <Decor rail={world.layout.rail} clearance={world.layout.corridorHalfWidth} perPoint={0} />
       <HeroTransit items={world.transit} k={k} viewport={size} sceneKey={scene.key} />
