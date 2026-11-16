@@ -12,9 +12,9 @@ import { useQualitySettings } from '../quality'
 import { useStylePreset } from '../style'
 import { applyToon } from '../toonMaterial'
 import { callAttention, cameraStill } from './attention'
-import { burstTime, CROWD, crowdSpots, JOLT, MEET, meetTime, newCrowd, poke, stepCrowd } from './crowdModel'
+import { burstTime, CROWD, crowdSpots, JOLT, MEET, meetTime, newCrowd, poke, reactTime, stepCrowd } from './crowdModel'
 import { useExperience } from '@/experience/store'
-import { onSpinningChair, poseOf } from './crowdPose'
+import { lookAtGuest, onSpinningChair, poseOf } from './crowdPose'
 import { chairKey, chairTurns } from '../physics/chairSpin'
 import { crowdColliders, MAX_CROWD_COLLIDERS } from '../physics/protocol'
 import { floorOptions, pickFloorGroups } from './floorModel'
@@ -335,6 +335,8 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
     }
   }, [skeletons])
   const extrasShown = useRef({ bars: [] as boolean[], zzz: false })
+  // E2d: each person's head, eased towards the guest (yaw, pitch, weight).
+  const looks = useRef<{ yaw: number; pitch: number; w: number }[]>([])
 
   // `?debug=1`: who is where, doing what, and where their heads are on screen (for checks).
   const camera = useThree((s) => s.camera)
@@ -362,7 +364,7 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
     }
   }, [model, people, camera, size, clock, office])
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera }, dt) => {
     const now = clock.elapsedTime
     const { crowd, grid } = model
     // Gags play where the camera looks (and may call its attention).
@@ -416,6 +418,18 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       shown.current[i] = true
       changed = true
       seen++
+      // E2d: the head turns to the guest passing by (eased, so it follows, not snaps).
+      // Not while their head is busy: banging it, hiding it.
+      const busy = (person.task === 'type' && now - person.bonkAt < CROWD.bonkTime) || (person.react === 'hide' && now - person.reactAt < reactTime('hide'))
+      const want = busy ? { yaw: 0, pitch: 0, weight: 0 } : lookAtGuest(pose, [camera.position.x, camera.position.y, camera.position.z])
+      const lk = (looks.current[i] ??= { yaw: 0, pitch: 0, w: 0 })
+      const k = 1 - Math.exp(-Math.min(dt, 0.1) * 4)
+      lk.yaw += (want.yaw - lk.yaw) * k
+      lk.pitch += (want.pitch - lk.pitch) * k
+      lk.w += (want.weight - lk.w) * k
+      if (lk.w > 0.01) {
+        pose = { ...pose, headY: pose.headY + (lk.yaw - pose.headY) * lk.w * 0.85, headX: pose.headX + (lk.pitch - pose.headX) * lk.w * 0.6 }
+      }
       sk.root.position.set(pose.at[0], pose.at[1] + pose.lift, pose.at[2])
       // Yaw first, then the tip back for lying down (E2b).
       sk.root.rotation.order = 'YXZ'

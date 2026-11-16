@@ -8,7 +8,7 @@
  */
 import type { Vec3 } from '../layout'
 import { alongPath } from './navGrid'
-import { burstTime, CROWD, JOLT, MEET, meetTime, REACT, type Crowd, type Person, type Reaction } from './crowdModel'
+import { burstTime, CROWD, JOLT, MEET, meetTime, reactTime, type Crowd, type Person, type Reaction } from './crowdModel'
 
 export interface Pose {
   /** Floor point under the hips, facing, and how far the body is raised / lowered (m). */
@@ -307,9 +307,10 @@ export function onSpinningChair(pose: Pose, pivot: Vec3, angle: number, speed: n
 
 /** A click reaction over any pose (u seconds in); seated people stay seated (no jump). */
 function reacting(base: Joints, u: number, kind: Reaction, seated: boolean): Joints {
-  if (u < 0 || u > REACT.time) return base
-  const w = smooth(u / 0.15) * (1 - smooth((u - REACT.time + 0.3) / 0.3))
-  const s = Math.sin((u / REACT.time) * Math.PI)
+  const T = reactTime(kind)
+  if (u < 0 || u > T) return base
+  const w = smooth(u / 0.15) * (1 - smooth((u - T + 0.3) / 0.3))
+  const s = Math.sin((u / T) * Math.PI)
   let r: Joints
   switch (kind) {
     case 'jump':
@@ -323,6 +324,12 @@ function reacting(base: Joints, u: number, kind: Reaction, seated: boolean): Joi
     case 'surprised':
       r = { ...base, torsoX: -0.2, headX: -0.25, armLZ: -1.2, armRZ: 1.2, armLX: -0.6, armRX: -0.6, foreL: -0.4, foreR: -0.4, lift: seated ? base.lift : s * 0.08 }
       break
+    case 'hide': {
+      // Ducks behind the monitor, arms over the head; then peeks out over it.
+      const peek = smooth((u - T * 0.6) / 0.3)
+      r = { ...base, lift: base.lift - 0.08, torsoX: 0.8 - peek * 0.45, headX: 0.5 - peek * 0.75, armLX: -2.3, armRX: -2.3, armLZ: 0.2, armRZ: -0.2, foreL: -0.7, foreR: -0.7 }
+      break
+    }
     case 'shrug':
       r = { ...base, armLZ: -0.6, armRZ: 0.6, armLX: -0.4, armRX: -0.4, foreL: -1.7, foreR: -1.7, headX: 0.15, headY: Math.sin(u * 4) * 0.3, torsoZ: 0.05 }
       break
@@ -330,12 +337,34 @@ function reacting(base: Joints, u: number, kind: Reaction, seated: boolean): Joi
   return mix(base, r, w)
 }
 
+/**
+ * E2d: where to turn the head to look at the guest passing by (the camera at `eye`): yaw and
+ * pitch for the head, and how much (0…1: near, and not behind their back). The caller eases it.
+ */
+export function lookAtGuest(pose: Pose, eye: Vec3): { yaw: number; pitch: number; weight: number } {
+  if (pose.lieX !== 0) return { yaw: 0, pitch: 0, weight: 0 }
+  const dx = eye[0] - pose.at[0]
+  const dz = eye[2] - pose.at[2]
+  const d = Math.hypot(dx, dz)
+  let yaw = Math.atan2(dx, dz) - pose.yaw
+  while (yaw > Math.PI) yaw -= Math.PI * 2
+  while (yaw < -Math.PI) yaw += Math.PI * 2
+  const behind = 1 - smooth((Math.abs(yaw) - 1.3) / 0.4)
+  const near = 1 - smooth((d - 4) / 4)
+  const head = pose.at[1] + 1.5 + pose.lift
+  return {
+    yaw: Math.max(-1.05, Math.min(1.05, yaw)),
+    pitch: Math.max(-0.35, Math.min(0.35, -Math.atan2(eye[1] - head, Math.max(d, 0.5)))),
+    weight: behind * near,
+  }
+}
+
 /** The pose of person `i` at scene time `now`, with a click reaction on top. */
 export function poseOf(c: Crowd, i: number, now: number): Pose {
   const pose = basePose(c, i, now)
   const p = c.people[i]!
   const u = now - p.reactAt
-  if (!(u >= 0 && u <= REACT.time)) return pose
+  if (!(u >= 0 && u <= reactTime(p.react))) return pose
   const seated = p.task === 'type' || p.task === 'sitDown' || p.task === 'standUp'
   const { at, yaw, ...j } = pose
   return { at, yaw, ...reacting(j, u, p.react, seated) }

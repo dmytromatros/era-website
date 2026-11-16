@@ -120,11 +120,22 @@ export interface Person {
   clicks: number[]
   /** Clicks so far (the reactions go round in turn). */
   pokes: number
+  /** E2d: when they last noticed the guest (scene time). */
+  noticedAt: number
 }
 
 /** What a person does when clicked: in turn, and a shrug when clicked again and again. */
-export type Reaction = 'jump' | 'wave' | 'surprised' | 'shrug'
-export const REACT = { time: 1.3, order: ['jump', 'wave', 'surprised'] as const, annoyedAfter: 3, window: 2.5 } as const
+export type Reaction = 'jump' | 'wave' | 'surprised' | 'shrug' | 'hide'
+export const REACT = { time: 1.3, hideTime: 2.6, order: ['jump', 'wave', 'surprised'] as const, annoyedAfter: 3, window: 2.5 } as const
+/** How long a reaction lasts (hiding behind the monitor is longer: duck, wait, peek). */
+export const reactTime = (r: Reaction) => (r === 'hide' ? REACT.hideTime : REACT.time)
+
+/**
+ * E2d — they notice the guest (the camera) walking past: someone near, who can see the camera
+ * (it is within ±100° of where they face), now and then waves — or, at a desk, ducks behind the
+ * monitor and peeks out. One at a time, each person rarely.
+ */
+export const NOTICE = { range: 5, cos: Math.cos(1.75), gap: 2.5, cooldown: 30, hide: 0.35, wave: 0.75 } as const
 
 /**
  * A click on person `i`: the sleeper jerks awake (their gag); anyone else reacts — in turn
@@ -173,6 +184,8 @@ export interface Crowd {
   boards: Vec3[]
   /** The last gag, and the last one that called the camera (scene time). */
   lastGag: number
+  /** E2d: the last time someone noticed the guest. */
+  lastNotice: number
   lastAttention: number
   rand: () => number
 }
@@ -295,6 +308,7 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
       react: 'jump',
       clicks: [],
       pokes: 0,
+      noticedAt: -Infinity,
     })
   }
   const quiet = {
@@ -304,6 +318,7 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
     boards,
     lastGag: -Infinity,
     lastAttention: -Infinity,
+    lastNotice: -Infinity,
     rand,
   }
   if (count <= 0) return { spots, people, nextMove: Infinity, ...quiet }
@@ -444,6 +459,50 @@ function startGag(c: Crowd, now: number, view: View): Attention | null {
   return c.rand() < CROWD.bonkAttention ? call({ at: [at[0], at[1] + 1.2, at[2]], start, dur: CROWD.bonkTime }, who) : null
 }
 
+/** E2d: the nearest person who sees the passing camera may wave, or duck behind the monitor. */
+function noticeGuest(c: Crowd, now: number, view: View) {
+  if (now - c.lastNotice < NOTICE.gap) return
+  let who: Person | null = null
+  let best = Infinity
+  for (const p of c.people) {
+    if (!['type', 'chat', 'pace', 'meet', 'present'].includes(p.task)) continue
+    if (now - p.noticedAt < NOTICE.cooldown || now - p.reactAt < reactTime(p.react) + 1) continue
+    if (now - p.bonkAt < CROWD.bonkTime + 0.5) continue
+    const spot = c.spots[p.spot]!
+    if (spot.corner >= 0 && burstTime(c, spot.corner, now) !== null) continue
+    if (spot.meeting !== undefined && meetTime(c, spot.meeting, now) !== null) continue
+    const at = placeOf(c, p, now)
+    const dx = view.eye[0] - at[0]
+    const dz = view.eye[2] - at[2]
+    const d = Math.hypot(dx, dz)
+    if (d > NOTICE.range || d < 0.8) continue
+    // Can they see the camera? (within ±100° of where they face)
+    if ((dx * Math.sin(spot.yaw) + dz * Math.cos(spot.yaw)) / d < NOTICE.cos) continue
+    if (d < best) {
+      best = d
+      who = p
+    }
+  }
+  if (!who) return
+  c.lastNotice = now
+  who.noticedAt = now
+  const r = c.rand()
+  if (who.task === 'type') {
+    if (r < NOTICE.hide) {
+      who.react = 'hide'
+      who.reactAt = now
+    } else if (r < NOTICE.hide + 0.4) {
+      who.react = 'wave'
+      who.reactAt = now
+    }
+    return
+  }
+  if (r < NOTICE.wave) {
+    who.react = 'wave'
+    who.reactAt = now
+  }
+}
+
 /** Where a person is on the floor right now (their spot, or on their walk). */
 function placeOf(c: Crowd, p: Person, now: number): Vec3 {
   if (p.task === 'walk') return alongPath(p.path, (now - p.since) * CROWD.walkSpeed).at
@@ -494,8 +553,9 @@ export function stepCrowd(c: Crowd, now: number, grid: NavGrid, view?: View): At
       p.since = now
     }
   }
-  // ---- a gag where the camera looks ----
+  // ---- a gag where the camera looks; someone notices the guest ----
   const attention = view ? startGag(c, now, view) : null
+  if (view) noticeGuest(c, now, view)
   // ---- someone sets off ----
   if (now < c.nextMove) return attention
   c.nextMove = now + between(rand, CROWD.moveEvery)

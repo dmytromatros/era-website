@@ -4,9 +4,9 @@ import { layoutRoute } from '../layout'
 import { blocked, buildOffice } from '../officeModel'
 import { routePlan } from '../route'
 import { buildNavGrid, clearLine, findPath, NAV, pathLength, walkable } from './navGrid'
-import { burstTime, chattersAt, CROWD, crowdSpots, hidden, MEET, meetTime, newCrowd, poke, REACT, stepCrowd, type Attention, type View } from './crowdModel'
+import { burstTime, chattersAt, CROWD, crowdSpots, hidden, MEET, meetTime, newCrowd, NOTICE, poke, REACT, stepCrowd, type Attention, type View } from './crowdModel'
 import type { Vec3 } from '../layout'
-import { onSpinningChair, poseOf } from './crowdPose'
+import { lookAtGuest, onSpinningChair, poseOf } from './crowdPose'
 import { FLOOR, floorOptions, pickFloorGroups } from './floorModel'
 import { toWorld } from '../exhibitModel'
 import { distanceToRail, onRouteFloor, placeProps, type StopExhibit } from '../physics/propsModel'
@@ -386,6 +386,42 @@ for (const [name, aspect] of [
         poke(crowd, s, 20)
         expect(crowd.people[s]!.bonkAt).toBe(20)
       }
+    })
+
+    it('E2d: someone near who sees the passing guest waves or hides — one at a time, rarely each', () => {
+      const crowd = newCrowd(spots, 20, 2, 0, steam)
+      const i = crowd.people.findIndex((p) => p.task === 'chat' || p.task === 'type')
+      const p = crowd.people[i]!
+      const spot = crowd.spots[p.spot]!
+      // The guest 2.5 m in front of them.
+      const eye: Vec3 = [spot.at[0] + Math.sin(spot.yaw) * 2.5, 1.6, spot.at[2] + Math.cos(spot.yaw) * 2.5]
+      const dir: [number, number] = [-Math.sin(spot.yaw), -Math.cos(spot.yaw)]
+      const notes: number[] = []
+      for (let now = 0; now < 40; now += 0.1) {
+        stepCrowd(crowd, now, grid, { eye, dir, still: false })
+        if (p.noticedAt === now) notes.push(now)
+      }
+      expect(notes.length).toBeGreaterThan(0)
+      for (let k = 1; k < notes.length; k++) expect(notes[k]! - notes[k - 1]!).toBeGreaterThanOrEqual(NOTICE.cooldown - 1e-6)
+      // Behind their back: they do not notice.
+      const other = newCrowd(spots, 20, 2, 0, steam)
+      const q = other.people[i]!
+      const back: Vec3 = [spot.at[0] - Math.sin(spot.yaw) * 2.5, 1.6, spot.at[2] - Math.cos(spot.yaw) * 2.5]
+      for (let now = 0; now < 10; now += 0.1) stepCrowd(other, now, grid, { eye: back, dir: [Math.sin(spot.yaw), Math.cos(spot.yaw)], still: false })
+      expect(q.noticedAt).toBe(-Infinity)
+    })
+
+    it('E2d: heads turn to the guest in front and near — not behind, not far, never past ±60°', () => {
+      const crowd = newCrowd(spots, 20, 2, 0, steam)
+      const i = crowd.people.findIndex((p) => p.task === 'chat')
+      const pose = poseOf(crowd, i, 1)
+      const f = [Math.sin(pose.yaw), Math.cos(pose.yaw)] as const
+      const at = (fwd: number, side: number): Vec3 => [pose.at[0] + f[0] * fwd + f[1] * side, 1.6, pose.at[2] + f[1] * fwd - f[0] * side]
+      expect(lookAtGuest(pose, at(3, 0)).weight).toBeGreaterThan(0.9)
+      expect(Math.abs(lookAtGuest(pose, at(3, 0)).yaw)).toBeLessThan(0.01)
+      expect(lookAtGuest(pose, at(-3, 0)).weight).toBe(0)
+      expect(lookAtGuest(pose, at(12, 0)).weight).toBe(0)
+      expect(Math.abs(lookAtGuest(pose, at(0.5, 3)).yaw)).toBeLessThanOrEqual(1.05)
     })
 
     it('chatting never jumps between poses (speaker ↔ listener blend)', () => {
