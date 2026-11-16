@@ -8,13 +8,15 @@
  */
 import type { Vec3 } from '../layout'
 import { alongPath } from './navGrid'
-import { burstTime, CROWD, type Crowd, type Person } from './crowdModel'
+import { burstTime, CROWD, JOLT, MEET, meetTime, type Crowd, type Person } from './crowdModel'
 
 export interface Pose {
   /** Floor point under the hips, facing, and how far the body is raised / lowered (m). */
   at: Vec3
   yaw: number
   lift: number
+  /** Lying down: the whole body tipped back by this much (π/2 = flat on the back, E2b). */
+  lieX: number
   torsoX: number
   torsoZ: number
   headX: number
@@ -35,7 +37,7 @@ export interface Pose {
 
 type Joints = Omit<Pose, 'at' | 'yaw'>
 
-const ZERO: Joints = { lift: 0, torsoX: 0, torsoZ: 0, headX: 0, headY: 0, armLX: 0, armLZ: 0, armRX: 0, armRY: 0, armRZ: 0, foreL: 0, foreR: 0, legL: 0, legR: 0, shinL: 0, shinR: 0 }
+const ZERO: Joints = { lift: 0, lieX: 0, torsoX: 0, torsoZ: 0, headX: 0, headY: 0, armLX: 0, armLZ: 0, armRX: 0, armRY: 0, armRZ: 0, foreL: 0, foreR: 0, legL: 0, legR: 0, shinL: 0, shinR: 0 }
 
 const smooth = (x: number) => {
   const t = Math.min(Math.max(x, 0), 1)
@@ -59,6 +61,96 @@ const CHAT = { turn: 3, blend: 0.25 } as const
 
 /** Pacing on the phone: speed (m/s) and the pause to turn at each end (s). */
 const PACE = { speed: 0.9, turn: 0.9 } as const
+
+/** At the meeting table: hands on it, listening, nodding now and then, looking at the board. */
+function attending(t: number, ph: number, boardSide: number): Joints {
+  return {
+    ...ZERO,
+    torsoX: 0.08,
+    torsoZ: Math.sin(t * 0.8 + ph) * 0.02,
+    headX: Math.max(0, Math.sin(t * 1.9 + ph)) * 0.1,
+    headY: boardSide * 0.35 + Math.sin(t * 0.4 + ph) * 0.1,
+    armLX: -0.55,
+    armRX: -0.55,
+    foreL: -0.55,
+    foreR: -0.55,
+  }
+}
+
+/** Applauding (u seconds in): hands meet in front, fast. */
+function clapping(base: Joints, u: number, w: number): Joints {
+  const clap = Math.abs(Math.sin(u * 14))
+  return mix(base, { ...base, armLX: -1.0, armRX: -1.0, armLZ: 0.2 + clap * 0.25, armRZ: -0.2 - clap * 0.25, foreL: -1.25, foreR: -1.25, headX: -0.05 }, w)
+}
+
+/** At the whiteboard: talking to the room, now and then pointing at the chart (on their −x side). */
+function presenting(t: number, ph: number): Joints {
+  const point = Math.max(0, Math.sin(t * 0.7 + ph))
+  return {
+    ...ZERO,
+    torsoZ: Math.sin(t * 1.1) * 0.03,
+    headY: -0.6 * point + Math.sin(t * 0.9) * 0.15,
+    armLZ: -1.25 * point,
+    armLX: 0.15 * point - 0.1,
+    foreL: -0.15,
+    armRX: -0.5 + Math.sin(t * 2.7 + ph) * 0.25,
+    foreR: -0.9,
+  }
+}
+
+/** The chart gag for the presenter (u seconds in): taps it, watches it fall, clutches their head. */
+function presentGag(base: Joints, u: number): Joints {
+  const tap = u < MEET.tap ? Math.abs(Math.sin((u / MEET.tap) * Math.PI * 3)) : 0
+  const point = smooth(u / 0.2) * (1 - smooth((u - MEET.dismay[0]) / 0.3))
+  const dismay = smooth((u - MEET.dismay[0]) / 0.3) * (1 - smooth((u - MEET.dismay[1]) / 0.5))
+  const pointing = { ...base, headY: -0.7, armLZ: -1.35 + tap * 0.15, armLX: 0.05, foreL: -0.1 - tap * 0.3 }
+  const clutch = { ...base, headY: 0, headX: 0.2, armLZ: -2.3, armRZ: 2.3, armLX: -0.3, armRX: -0.3, foreL: -2.1, foreR: -2.1, torsoX: 0.15 }
+  return mix(mix(base, pointing, point), clutch, dismay)
+}
+
+/**
+ * Asleep on a sofa (flat on the back, arms resting along the body — lying, "forward" is up:
+ * folded arms stuck up into the air, Dima's first look); `snore` 0…1 makes it heave.
+ */
+function sleeping(t: number, snore: number): Joints {
+  const breathe = Math.sin(t * 1.3)
+  return {
+    ...ZERO,
+    lieX: -Math.PI / 2,
+    lift: breathe * 0.01 + snore * Math.max(0, Math.sin(t * 9)) * 0.05,
+    torsoX: breathe * 0.02,
+    headY: 0.35,
+    // One hand on the belly (a little up and in), the other down along the side.
+    armLX: -0.25,
+    armLZ: 0.25,
+    foreL: -0.5,
+    armRX: -0.05,
+    armRZ: -0.05,
+    foreR: -0.1,
+  }
+}
+
+/** The jolt awake (u seconds in): snores harder, jerks up to sitting, looks around, flops back. */
+function jolt(t: number, u: number): Joints {
+  const lying = sleeping(t, u < JOLT.snore ? smooth(u / JOLT.snore) : 0)
+  const up = smooth((u - JOLT.snore) / JOLT.up) * (1 - smooth((u - JOLT.snore - JOLT.up - JOLT.look) / JOLT.down))
+  const look = u - JOLT.snore - JOLT.up
+  const sitting = {
+    ...lying,
+    torsoX: 1.35,
+    headX: -0.1,
+    headY: look > 0 ? Math.sin(look * 5) * 0.7 : 0,
+    // Flailing arms on the way up, then out in confusion.
+    armLZ: -0.9,
+    armRZ: 0.9,
+    armLX: -0.6,
+    armRX: -0.6,
+    foreL: -0.6,
+    foreR: -0.6,
+    lift: 0,
+  }
+  return mix(lying, sitting, up)
+}
 
 /** Hips sit this much lower than standing (seat top ≈ 0.5 m, hips 0.62 m up when standing). */
 export const SIT_LIFT = -0.1
@@ -260,6 +352,29 @@ export function poseOf(c: Crowd, i: number, now: number): Pose {
         yaw: turn(desk.yaw, standYaw, smooth(w * 1.4)),
         ...j,
       }
+    }
+    case 'present': {
+      const base = presenting(t, ph)
+      const u = spot.meeting !== undefined ? meetTime(c, spot.meeting, now) : null
+      return { at: spot.at, yaw: spot.yaw, ...(u === null ? base : presentGag(base, u)) }
+    }
+    case 'meet': {
+      // The board is on the attendee's left or right: from their facing towards the presenter.
+      const boardSide = Math.sign(Math.sin(i * 1.7)) || 1
+      const base = attending(t, ph, boardSide * 0.4)
+      const u = spot.meeting !== undefined ? meetTime(c, spot.meeting, now) : null
+      if (u === null) return { at: spot.at, yaw: spot.yaw, ...base }
+      // They watch the bars drop, then applaud (slow, ironic).
+      const w = smooth((u - MEET.dismay[0]) / 0.25) * (1 - smooth((u - MEET.dismay[1]) / 0.4))
+      return { at: spot.at, yaw: spot.yaw, ...clapping({ ...base, headY: base.headY * 1.6 }, u, w) }
+    }
+    case 'sleep': {
+      // Lying along the seat (its local x), head towards +x: body tipped back, turned −90°.
+      const x = [Math.cos(spot.yaw), 0, -Math.sin(spot.yaw)] as const
+      const u = now - p.bonkAt
+      const j = u >= 0 && u < JOLT.total ? jolt(t, u) : sleeping(t, 0)
+      // Feet 0.89 m from the seat's centre (the 1.78 m body centred), on top of the seat.
+      return { at: [spot.at[0] - x[0] * 0.89, spot.at[1] + 0.17, spot.at[2] - x[2] * 0.89], yaw: spot.yaw - Math.PI / 2, ...j }
     }
     case 'pace': {
       // Up and down on the phone: walk to the far end, a pause to turn, walk back.

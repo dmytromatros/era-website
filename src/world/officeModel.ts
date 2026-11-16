@@ -6,7 +6,8 @@
  * - corridor sides become glass partitions (frosted band low, clear glass above);
  * - stairs lead to a mezzanine on pillars with a glass railing;
  * - furniture (desk clusters, plants, shelves, sofas) fills free floor beside the path;
- * - a coffee corner or two (E2a): where the office's people meet (world/crowd).
+ * - a coffee corner or two (E2a): where the office's people meet (world/crowd);
+ * - a stand-up meeting corner (E2b): a high table and a whiteboard with a chart.
  *
  * Everything is made of primitives (boxes, cylinders, balls) in a few materials, so the renderer
  * can draw all of it with a handful of instanced meshes. Nothing may stand on `clear` floor.
@@ -58,6 +59,25 @@ export interface CoffeeCorner {
   spots: { at: Vec3; yaw: number }[]
 }
 
+/** A stand-up meeting corner (E2b): a high table, a whiteboard with a bar chart, four places. */
+export interface MeetingCorner {
+  at: Vec3
+  yaw: number
+  /** The chart's bars on the board (world): bottom centre, size [w, h, d], colour key. */
+  bars: { base: Vec3; size: Vec3; color: 'accentA' | 'accentB' | 'accentC' }[]
+  /** Where the presenter stands (beside the board) and the three around the table. */
+  presenter: { at: Vec3; yaw: number }
+  attendees: { at: Vec3; yaw: number }[]
+  /** The board's yaw (its face looks along it). */
+  boardYaw: number
+}
+
+/** A sofa (lounge, E2b): its seat's top centre and yaw (the seat runs along its local x). */
+export interface Sofa {
+  seat: Vec3
+  yaw: number
+}
+
 export interface Office {
   solid: Prim[]
   glass: Box[]
@@ -76,6 +96,10 @@ export interface Office {
   chairs: Chair[]
   /** Coffee corners (E2a), 0–2. */
   coffee: CoffeeCorner[]
+  /** A stand-up meeting corner (E2b), 0–1. */
+  meeting: MeetingCorner[]
+  /** Every sofa (E2b: someone may sleep on one). */
+  sofas: Sofa[]
 }
 
 export const OFFICE = {
@@ -149,13 +173,30 @@ export function crosses(a: Vec3, b: Vec3, box: Box): boolean {
   return true
 }
 
+/** Does the floor segment a → b pass through circle `c` (not counting its last metre at b)? */
+function lineHits(a: Vec3, b: Vec3, c: { x: number; z: number; r: number }): boolean {
+  const dx = b[0] - a[0]
+  const dz = b[2] - a[2]
+  const len = Math.hypot(dx, dz)
+  if (len < 1e-6) return false
+  const t = ((c.x - a[0]) * dx + (c.z - a[2]) * dz) / (len * len)
+  if (t <= 0 || t * len >= len - 1) return false
+  return Math.hypot(a[0] + dx * t - c.x, a[2] + dz * t - c.z) < c.r * 0.8
+}
+
 /**
  * How close a stop sees floor point `p` from (m): it must be within the camera's view at that
  * stop (±35° around where it looks). Behind a frosted glass band it counts as twice as far:
  * seen, but paler (excluding it emptied every glass corridor — Dima 2026-11-16: "behind the
  * glass there is almost nobody"). ∞ = no stop sees it.
  */
-export function seenFrom(p: Vec3, stations: WorldLayout['stations'], frosted: Box[]): number {
+export function seenFrom(
+  p: Vec3,
+  stations: WorldLayout['stations'],
+  frosted: Box[],
+  /** If given, furniture in the way hides it from that stop (a circle the line passes through). */
+  blockers?: { x: number; z: number; r: number }[],
+): number {
   let best = Infinity
   for (const st of stations) {
     const lx = st.focus[0] - st.viewpoint[0]
@@ -164,6 +205,7 @@ export function seenFrom(p: Vec3, stations: WorldLayout['stations'], frosted: Bo
     const pz = p[2] - st.viewpoint[2]
     const d = Math.hypot(px, pz)
     if (d <= 0 || d >= best || (lx * px + lz * pz) / (Math.hypot(lx, lz) * d) <= Math.cos(0.6)) continue
+    if (blockers?.some((b) => lineHits(st.viewpoint, p, b))) continue
     best = Math.min(best, frosted.some((f) => crosses(st.viewpoint, p, f)) ? d * 2 : d)
   }
   return best
@@ -259,6 +301,42 @@ const COFFEE_SPOTS: { at: Vec3; yaw: number }[] = [
   { at: [0.5, 0, 1.45], yaw: -Math.PI / 2 + 0.35 },
 ]
 const COFFEE_STEAM: Vec3 = [-0.28, 1.42, -0.05]
+
+/**
+ * A stand-up meeting corner (E2b), front = +z: a high table, and behind it a whiteboard on legs
+ * facing the table. The chart on the board is drawn by the crowd (its bars fall off).
+ */
+function meetingCorner(): Prim[] {
+  return [
+    box([0, 1.0, 0], [1.3, 0.04, 0.7], 'wood'),
+    box([-0.55, 0.5, 0], [0.05, 1.0, 0.05], 'metal'),
+    box([0.55, 0.5, 0], [0.05, 1.0, 0.05], 'metal'),
+    box([0, 0.06, 0], [1.2, 0.04, 0.06], 'metal'),
+    // whiteboard: white panel in a dark frame, on two legs
+    box([0, 1.5, -1.25], [1.7, 1.05, 0.03], 'wall'),
+    box([0, 2.04, -1.25], [1.76, 0.04, 0.05], 'frame'),
+    box([0, 0.96, -1.25], [1.76, 0.04, 0.05], 'frame'),
+    box([-0.86, 1.05, -1.25], [0.04, 2.1, 0.05], 'frame'),
+    box([0.86, 1.05, -1.25], [0.04, 2.1, 0.05], 'frame'),
+    box([-0.86, 0.02, -1.25], [0.06, 0.04, 0.5], 'metal'),
+    box([0.86, 0.02, -1.25], [0.06, 0.04, 0.5], 'metal'),
+  ]
+}
+const MEETING = {
+  bars: [
+    { x: -0.45, h: 0.28, color: 'accentA' },
+    { x: -0.12, h: 0.44, color: 'accentB' },
+    { x: 0.21, h: 0.66, color: 'accentC' },
+  ] as const,
+  barBase: 1.1,
+  boardZ: -1.25 + 0.03,
+  presenter: { at: [1.2, 0, -0.95] as Vec3, yaw: -0.5 },
+  attendees: [
+    { at: [-1.05, 0, 0.15] as Vec3, yaw: Math.PI * 0.8 },
+    { at: [1.05, 0, 0.3] as Vec3, yaw: -Math.PI * 0.85 },
+    { at: [-0.35, 0, 0.95] as Vec3, yaw: Math.PI },
+  ],
+}
 
 function lounge(): Prim[] {
   return [
@@ -357,6 +435,7 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
   const keepOff = [...clear, ...mezzClear]
 
   // ---- furniture beside each zone's free floor ----
+  const sofas: Sofa[] = []
   const placed: { x: number; z: number; r: number }[] = []
   const fits = (x: number, z: number, r: number) =>
     x - r > bounds.minX + 1 &&
@@ -381,7 +460,15 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
         const yaw = Math.atan2(-right(c.frame.heading)[0] * s, -right(c.frame.heading)[2] * s)
         if (roll < 0.55) tryPlace(deskCluster(), inFrame(c.frame, along, s * (c.half + 2.6)), yaw, 2)
         else if (roll < 0.7) tryPlace(shelf(Math.floor(rand() * 1000)), inFrame(c.frame, along, s * (c.half + 1.3)), yaw, 0.8)
-        else if (roll < 0.85) tryPlace(lounge(), inFrame(c.frame, along, s * (c.half + 2)), yaw, 1.5)
+        else if (roll < 0.85) {
+          const at = inFrame(c.frame, along, s * (c.half + 2))
+          if (tryPlace(lounge(), at, yaw, 1.5)) {
+            // The seat (lounge(): box at local (0, 0.22, −0.3), 0.44 high): its top centre.
+            const k = Math.cos(yaw)
+            const sn = Math.sin(yaw)
+            sofas.push({ seat: [at[0] + -0.3 * sn, 0.44, at[2] + -0.3 * k], yaw })
+          }
+        }
         tryPlace(plant(rand() < 0.5), inFrame(c.frame, along + 2.3, s * (c.half + 0.9)), 0, 0.45)
       }
     }
@@ -432,6 +519,51 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
     placed.push({ x: at[0], z: at[2], r: 0.8 })
     solid.push(...place(coffeeCounter(), at, yaw))
     coffee.push({ at, yaw, steam: toWorld(COFFEE_STEAM), spots })
+  }
+
+  // ---- a stand-up meeting corner (E2b): the best spot a stop sees with no furniture in the
+  // way (a first try behind the desks was hidden by their screens), board facing the way the
+  // camera comes from (so the chart and the presenter's face are seen) ----
+  const meeting: MeetingCorner[] = []
+  const blockers = [...placed, ...columns]
+  const meetCandidates: { at: Vec3; yaw: number }[] = []
+  clear.forEach((c, ci) => {
+    if (c.frame.level > 0 || ci === 0) return
+    const fw = forward(c.frame.heading)
+    for (let along = c.from + 1.5; along < c.to - 1.5; along += 2.3) {
+      for (const s of [-1, 1]) {
+        for (const out of [2.4, 4.4, 6.4]) meetCandidates.push({ at: inFrame(c.frame, along, s * (c.half + out)), yaw: Math.atan2(fw[0], fw[2]) })
+      }
+    }
+  })
+  const meetOrder = meetCandidates
+    .map((c) => ({ c, seen: seenFrom(c.at, layout.stations, frosted, blockers) }))
+    .filter((o) => Number.isFinite(o.seen))
+    .sort((a, b) => a.seen - b.seen)
+  for (const { c: { at: base, yaw: along } } of meetOrder) {
+    if (meeting.length) break
+    const yaw = along + Math.PI
+    const c = Math.cos(yaw)
+    const sn = Math.sin(yaw)
+    const toWorld = (v: Vec3): Vec3 => [base[0] + v[0] * c + v[2] * sn, base[1] + v[1], base[2] - v[0] * sn + v[2] * c]
+    const centre = toWorld([0, 0, -0.5])
+    const people = [MEETING.presenter, ...MEETING.attendees].map((p) => toWorld(p.at))
+    if (!free(centre[0], centre[2], 1.3) || !people.every((p) => free(p[0], p[2], 0.4))) continue
+    if (coffee.some((k) => Math.hypot(k.at[0] - centre[0], k.at[2] - centre[2]) < 8)) continue
+    placed.push({ x: centre[0], z: centre[2], r: 1.3 })
+    solid.push(...place(meetingCorner(), base, yaw))
+    meeting.push({
+      at: base,
+      yaw,
+      boardYaw: yaw,
+      bars: MEETING.bars.map((b) => ({
+        base: toWorld([b.x, MEETING.barBase, MEETING.boardZ]),
+        size: [0.2, b.h, 0.03] as Vec3,
+        color: b.color,
+      })),
+      presenter: { at: people[0]!, yaw: MEETING.presenter.yaw + yaw },
+      attendees: MEETING.attendees.map((a, i) => ({ at: people[i + 1]!, yaw: a.yaw + yaw })),
+    })
   }
 
   // ---- ceiling light panels ----
@@ -486,5 +618,7 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
     keepOff,
     chairs: [...chairsByPivot.values()],
     coffee,
+    meeting,
+    sofas,
   }
 }

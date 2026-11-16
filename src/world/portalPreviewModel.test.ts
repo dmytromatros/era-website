@@ -72,6 +72,8 @@ describe('portal preview (B2)', () => {
       keepOff: [],
       chairs: [],
       coffee: [],
+      meeting: [],
+      sofas: [],
     }
     const kept = cullInFront(office, t)
     expect(kept.solid.map((p) => p.center[2])).toEqual([-3])

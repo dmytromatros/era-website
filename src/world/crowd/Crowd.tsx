@@ -11,7 +11,7 @@ import { useQualitySettings } from '../quality'
 import { useStylePreset } from '../style'
 import { applyToon } from '../toonMaterial'
 import { callAttention, cameraStill } from './attention'
-import { burstTime, CROWD, crowdSpots, newCrowd, stepCrowd } from './crowdModel'
+import { burstTime, CROWD, crowdSpots, JOLT, MEET, meetTime, newCrowd, stepCrowd } from './crowdModel'
 import { onSpinningChair, poseOf } from './crowdPose'
 import { chairKey, chairTurns } from '../physics/chairSpin'
 import { floorOptions, pickFloorGroups } from './floorModel'
@@ -27,8 +27,11 @@ import type { PropSpot, StopExhibit } from '../physics/propsModel'
  *   fourth — 4 draw calls for the whole crowd, however many people;
  * - the same shader programs as the office's own instanced meshes (no new program);
  * - a person off camera is not posed (rule 35): their boxes are collapsed once and skipped;
- * - simpler than a character up close (no IK, springs or accessories): they are always away
- *   from the camera, beyond the route's clear floor.
+ * - simpler than a character (no IK, springs, accessories, badges or click reactions; square
+ *   head and body). Built for people away from the camera — since round 2 some stand on the
+ *   route's floor too (floorModel.ts), a few metres from it: there the difference can show.
+ * - E2b: the meeting chart's bars (extra lit instances after the people's) and the sleeper's
+ *   "Zzz" (extra dark instances): no extra draw calls.
  */
 const EYE = '#17171a'
 const SHOE = '#232326'
@@ -36,6 +39,17 @@ const FOOT_X = 0.14
 const OVERLAP = 0.04
 const MAX_PEOPLE = 20
 const PUFFS = 12
+/** E2b: bars on a meeting board; "Zzz" boxes for the (one) sleeper — 3 letters × 3 strokes. */
+const BARS = 3
+const ZZZ = 9
+const BAR_COLOR = { accentA: '#3b6cf6', accentB: '#2bb673', accentC: '#ff6b5b' } as const
+/** The corridor sofa (E2b, floorModel.ts), in its own frame (front +z, seat along x): seat, back, two arms. */
+const COUCH: { at: [number, number, number]; size: [number, number, number] }[] = [
+  { at: [0, 0.22, 0], size: [2.1, 0.44, 0.86] },
+  { at: [0, 0.64, -0.35], size: [2.1, 0.5, 0.16] },
+  { at: [-0.96, 0.4, 0], size: [0.18, 0.56, 0.86] },
+  { at: [0.96, 0.4, 0], size: [0.18, 0.56, 0.86] },
+]
 
 type Part = { node: THREE.Object3D; color: 'skin' | 'shirt' | 'pants' | 'hair' | 'shoe' }
 
@@ -149,12 +163,26 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
     const seed = (PAGE_SEED ^ Math.round(office.bounds.minX * 97 + office.bounds.maxZ * 13)) >>> 0
     const groups = pickFloorGroups(floorOptions(layout, floor.exhibits, floor.props, floor.skip), seed)
     const spots = crowdSpots(office, layout, grid, groups)
-    return { grid, crowd: newCrowd(spots, MAX_PEOPLE, seed, clock.elapsedTime, office.coffee.map((c) => c.steam)) }
+    // The meeting boards' centres (gags start when the camera sees them).
+    const boards = office.meeting.map((m): [number, number, number] => {
+      const n = m.bars.length
+      const x = m.bars.reduce((s, b) => s + b.base[0], 0) / n
+      const z = m.bars.reduce((s, b) => s + b.base[2], 0) / n
+      return [x, m.bars[0]!.base[1] + 0.35, z]
+    })
+    return { grid, crowd: newCrowd(spots, MAX_PEOPLE, seed, clock.elapsedTime, office.coffee.map((c) => c.steam), boards) }
   }, [office, layout, clock, floor])
   const people = Math.min(count, model.crowd.people.length)
   const skeletons = useMemo(() => model.crowd.people.map(() => skeleton()), [model])
   const litPer = skeletons[0]?.lit.length ?? 0
   const darkPer = skeletons[0]?.dark.length ?? 0
+  // Extra instances after the people's: the meeting bars (lit), the sleeper's Zzz (dark).
+  const barsAt = people * litPer
+  const zzzAt = people * darkPer
+  const couch = useMemo(() => model.crowd.spots.find((s) => s.couch) ?? null, [model])
+  const couchAt = barsAt + office.meeting.length * BARS
+  const litCount = couchAt + (couch ? COUCH.length : 0)
+  const darkCount = zzzAt + ZZZ
 
   const materials = useMemo(
     () => ({
@@ -185,7 +213,25 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       mesh.instanceMatrix.needsUpdate = true
     }
     if (steam.current) steam.current.visible = false
-  }, [people, litPer, darkPer, office])
+  }, [people, litPer, darkPer, office, litCount, darkCount])
+
+  // The corridor sofa never moves: placed once (after the clean-up above).
+  useLayoutEffect(() => {
+    const mesh = body.current
+    if (!mesh || !couch) return
+    const o = new THREE.Object3D()
+    const c = Math.cos(couch.yaw)
+    const s = Math.sin(couch.yaw)
+    COUCH.forEach((part, k) => {
+      const [x, y, z] = part.at
+      o.position.set(couch.at[0] + x * c + z * s, y, couch.at[2] - x * s + z * c)
+      o.rotation.set(0, couch.yaw, 0)
+      o.scale.set(...part.size)
+      o.updateMatrix()
+      mesh.setMatrixAt(couchAt + k, o.matrix)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+  }, [couch, couchAt, litCount, people, litPer, darkPer, office, darkCount])
 
   // Colours: once per deal.
   useLayoutEffect(() => {
@@ -198,8 +244,10 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
         mesh.setColorAt(i * litPer + k, c.set(hex))
       })
     })
+    office.meeting.forEach((m, k) => m.bars.forEach((bar, j) => mesh.setColorAt(barsAt + k * BARS + j, c.set(BAR_COLOR[bar.color]))))
+    if (couch) COUCH.forEach((_, k) => mesh.setColorAt(couchAt + k, c.set(world.office.fabricB)))
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [model, skeletons, people, litPer])
+  }, [model, skeletons, people, litPer, office, barsAt, couch, couchAt, world])
 
   const frustum = useMemo(() => new THREE.Frustum(), [])
   const projView = useMemo(() => new THREE.Matrix4(), [])
@@ -207,6 +255,21 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
   const shown = useRef<boolean[]>([])
   const tmp = useMemo(() => new THREE.Object3D(), [])
   const look = useMemo(() => new THREE.Vector3(), [])
+  // A "Z" of three strokes, turned to face the camera (E2b).
+  const zee = useMemo(() => {
+    const g = new THREE.Object3D()
+    const stroke = (y: number, rz: number, len: number) => {
+      const o = new THREE.Object3D()
+      o.position.set(0, y, 0)
+      o.rotation.z = rz
+      o.scale.set(len, 0.2, 0.05)
+      g.add(o)
+      return o
+    }
+    return { g, strokes: [stroke(0.5, 0, 1), stroke(0, Math.PI / 4, 1.3), stroke(-0.5, 0, 1)] }
+  }, [])
+  const headAt = useMemo(() => new THREE.Vector3(), [])
+  const extrasShown = useRef({ bars: [] as boolean[], zzz: false })
 
   // `?debug=1`: who is where, doing what, and where their heads are on screen (for checks).
   const camera = useThree((s) => s.camera)
@@ -281,7 +344,9 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       changed = true
       seen++
       sk.root.position.set(pose.at[0], pose.at[1] + pose.lift, pose.at[2])
-      sk.root.rotation.set(0, pose.yaw, 0)
+      // Yaw first, then the tip back for lying down (E2b).
+      sk.root.rotation.order = 'YXZ'
+      sk.root.rotation.set(pose.lieX, pose.yaw, 0)
       sk.torso.rotation.set(pose.torsoX, 0, pose.torsoZ)
       sk.head.rotation.set(pose.headX, pose.headY, 0)
       sk.armL.rotation.set(pose.armLX, 0, pose.armLZ)
@@ -299,14 +364,84 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       sk.lit.forEach((part, k) => b.setMatrixAt(i * litPer + k, part.node.matrixWorld))
       const onPhone = crowd.people[i]!.task === 'pace'
       sk.dark.forEach((node, k) => e.setMatrixAt(i * darkPer + k, node === sk.phone && !onPhone ? ZERO : node.matrixWorld))
-      // A soft shadow on the floor, smaller while they are in the air.
+      // A soft shadow on the floor, smaller while they are in the air (none lying on a sofa).
       const air = Math.max(0, pose.lift)
       tmp.position.set(pose.at[0], pose.at[1] + 0.006, pose.at[2])
       tmp.rotation.set(0, 0, 0)
-      tmp.scale.setScalar(1 - air * 1.5)
+      tmp.scale.setScalar(pose.lieX !== 0 ? 0 : 1 - air * 1.5)
       tmp.updateMatrix()
       s.setMatrixAt(i, tmp.matrix)
+      // The sleeper's Zzz: three letters rising from the head, one after another (not while
+      // they jerk awake).
+      if (person.task === 'sleep') {
+        sk.head.getWorldPosition(headAt)
+        const awake = now - person.bonkAt >= 0 && now - person.bonkAt < JOLT.total
+        for (let z = 0; z < 3; z++) {
+          const u = (((now + person.phase) / 2.4 + z / 3) % 1 + 1) % 1
+          zee.g.position.set(headAt.x + u * 0.25, headAt.y + 0.45 + u * 0.8, headAt.z)
+          zee.g.quaternion.copy(camera.quaternion)
+          zee.g.scale.setScalar(awake ? 0 : (0.1 + u * 0.16) * Math.sin(Math.PI * Math.min(u * 1.25, 1)))
+          zee.g.updateMatrixWorld(true)
+          zee.strokes.forEach((st, k) => e.setMatrixAt(zzzAt + z * 3 + k, st.matrixWorld))
+        }
+        extrasShown.current.zzz = true
+      }
     }
+    // Nobody sleeping in view: the Zzz go (once).
+    if (extrasShown.current.zzz && !crowd.people.slice(0, people).some((p, i) => p.task === 'sleep' && shown.current[i])) {
+      for (let k = 0; k < ZZZ; k++) e.setMatrixAt(zzzAt + k, ZERO)
+      extrasShown.current.zzz = false
+      changed = true
+    }
+    // The meeting chart's bars: on the board; in the gag they drop off one by one, tip over on
+    // the floor, and are back on the board by the end.
+    office.meeting.forEach((m, k) => {
+      const centre = crowd.boards[k]!
+      sphere.center.set(centre[0], centre[1], centre[2])
+      const inView = frustum.intersectsSphere(sphere)
+      if (!inView) {
+        if (extrasShown.current.bars[k] !== false) {
+          for (let j = 0; j < BARS; j++) b.setMatrixAt(barsAt + k * BARS + j, ZERO)
+          extrasShown.current.bars[k] = false
+          changed = true
+        }
+        return
+      }
+      extrasShown.current.bars[k] = true
+      changed = true
+      seen++
+      const u = meetTime(crowd, k, now)
+      const fx = Math.sin(m.boardYaw)
+      const fz = Math.cos(m.boardYaw)
+      m.bars.forEach((bar, j) => {
+        const [w, h, d] = bar.size
+        let y = bar.base[1] + h / 2
+        let out = 0
+        let tip = 0
+        let grow = 1
+        if (u !== null) {
+          const v = (u - MEET.tap - j * MEET.dropEach) / MEET.fall
+          if (u >= MEET.back - 0.35) {
+            grow = Math.min(1, Math.max(0, (u - (MEET.back - 0.35)) / 0.35))
+          } else if (v > 0) {
+            const k2 = Math.min(v, 1)
+            const floorY = d / 2 + 0.01
+            y = bar.base[1] + h / 2 + (floorY - (bar.base[1] + h / 2)) * k2 * k2 + (v > 1 ? 0 : 0)
+            // A little hop when it lands.
+            if (v > 1 && v < 1.4) y += Math.sin(((v - 1) / 0.4) * Math.PI) * 0.06
+            out = k2 * (0.15 + h / 2)
+            tip = k2 * (Math.PI / 2)
+          }
+        }
+        tmp.position.set(bar.base[0] + fx * out, y, bar.base[2] + fz * out)
+        tmp.rotation.order = 'YXZ'
+        tmp.rotation.set(tip, m.boardYaw, 0)
+        tmp.scale.set(w * grow, h * grow, d * grow)
+        tmp.updateMatrix()
+        b.setMatrixAt(barsAt + k * BARS + j, tmp.matrix)
+      })
+    })
+    tmp.rotation.order = 'XYZ'
     if (changed) {
       b.instanceMatrix.needsUpdate = true
       e.instanceMatrix.needsUpdate = true
@@ -360,8 +495,8 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
   if (!people) return null
   return (
     <group>
-      <instancedMesh key={`b${people}`} ref={body} args={[BOX, materials.body, people * litPer]} frustumCulled={false} raycast={noRaycast} />
-      <instancedMesh key={`e${people}`} ref={eyes} args={[BOX, materials.eye, people * darkPer]} frustumCulled={false} raycast={noRaycast} />
+      <instancedMesh key={`b${litCount}`} ref={body} args={[BOX, materials.body, litCount]} frustumCulled={false} raycast={noRaycast} />
+      <instancedMesh key={`e${darkCount}`} ref={eyes} args={[BOX, materials.eye, darkCount]} frustumCulled={false} raycast={noRaycast} />
       <instancedMesh key={`s${people}`} ref={shadows} args={[SHADOW, materials.shadow, people]} frustumCulled={false} raycast={noRaycast} />
       {office.coffee.length > 0 && (
         <instancedMesh ref={steam} args={[PUFF, materials.steam, office.coffee.length * PUFFS]} frustumCulled={false} raycast={noRaycast} />

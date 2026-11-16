@@ -4,7 +4,7 @@ import { layoutRoute } from '../layout'
 import { blocked, buildOffice } from '../officeModel'
 import { routePlan } from '../route'
 import { buildNavGrid, clearLine, findPath, NAV, pathLength, walkable } from './navGrid'
-import { burstTime, chattersAt, CROWD, crowdSpots, hidden, newCrowd, stepCrowd, type Attention, type View } from './crowdModel'
+import { burstTime, chattersAt, CROWD, crowdSpots, hidden, MEET, meetTime, newCrowd, stepCrowd, type Attention, type View } from './crowdModel'
 import type { Vec3 } from '../layout'
 import { onSpinningChair, poseOf } from './crowdPose'
 import { FLOOR, floorOptions, pickFloorGroups } from './floorModel'
@@ -98,7 +98,7 @@ for (const [name, aspect] of [
     })
 
     it('over a few minutes: people get up, walk, sit; never two on one spot; poses stay sane', () => {
-      const crowd = newCrowd(spots, 8, 7, 0, steam)
+      const crowd = newCrowd(spots, 20, 7, 0, steam)
       const tasks = new Set<string>()
       let moves = 0
       let bursts = 0
@@ -179,6 +179,28 @@ for (const [name, aspect] of [
         }
       })
 
+      it('a sofa fits whole beside an exhibit, facing the camera path, one per page view', () => {
+        const sofas = options.filter((o) => o.kind === 'sofa')
+        // A narrow (portrait) screen's corridors are too tight for a sofa by the wall: then the
+        // sleeper takes an office sofa instead.
+        if (name === 'wide') expect(sofas.length).toBeGreaterThan(0)
+        for (const g of sofas) {
+          const c = g.points[0]
+          const lx = Math.cos(g.yaw!)
+          const lz = -Math.sin(g.yaw!)
+          for (const a of [-1.05, 0, 1.05]) {
+            const p: Vec3 = [c[0] + lx * a, 0, c[2] + lz * a]
+            expect(onRouteFloor(layout, p[0], p[2], 0.35)).toBe(true)
+            expect(distanceToRail(layout.rail, p[0], p[2])).toBeGreaterThan(FLOOR.sofaFromRail)
+          }
+          // Against the wall: a step back from its back is off the route's floor (the glass /
+          // the clear floor's edge); its front faces into the corridor.
+          const back: Vec3 = [c[0] - Math.sin(g.yaw!) * 1.1, 0, c[2] - Math.cos(g.yaw!) * 1.1]
+          expect(onRouteFloor(layout, back[0], back[2], 0)).toBe(false)
+        }
+        for (const seed of [1, 2, 3]) expect(pickFloorGroups(options, seed).filter((g) => g.kind === 'sofa').length).toBe(sofas.length ? 1 : 0)
+      })
+
       it('a few groups per page view, spread out, different per seed', () => {
         const a = pickFloorGroups(options, 1)
         expect(a.length).toBeGreaterThan(0)
@@ -195,7 +217,11 @@ for (const [name, aspect] of [
         const sp = crowdSpots(office, layout, grid, groups)
         const crowd = newCrowd(sp, 12, 2, 0, steam)
         const floor = crowd.people.filter((p) => ['floor', 'pace'].includes(sp[p.spot]!.kind))
-        expect(floor.length).toBe(groups.reduce((n, g) => n + (g.kind === 'pair' ? 2 : 1), 0))
+        expect(floor.length).toBe(groups.reduce((n, g) => n + (g.kind === 'pair' ? 2 : g.kind === 'pace' ? 1 : 0), 0))
+        // The corridor sofa (if this page has room for one) gets the sleeper.
+        if (groups.some((g) => g.kind === 'sofa')) {
+          expect(crowd.people.filter((p) => p.task === 'sleep' && sp[p.spot]!.couch).length).toBe(1)
+        }
         for (let now = 0; now < 120; now += 0.25) {
           stepCrowd(crowd, now, grid)
           crowd.people.forEach((p, i) => {
@@ -259,6 +285,81 @@ for (const [name, aspect] of [
       const fast = onSpinningChair(pose, seat.at, 1, 12)
       expect(fast.armLZ).toBeLessThan(-1.5)
       expect(fast.armRZ).toBeGreaterThan(1.5)
+    })
+
+    describe('E2b: the stand-up meeting and the sleeper', () => {
+      const boards = office.meeting.map((m): Vec3 => [m.bars[0]!.base[0], m.bars[0]!.base[1] + 0.35, m.bars[0]!.base[2]])
+
+      it('a meeting corner off the clear floor, in view of a stop, its four places walkable floor', () => {
+        expect(office.meeting.length).toBe(1)
+        const m = office.meeting[0]!
+        for (const p of [m.presenter.at, ...m.attendees.map((a) => a.at)]) {
+          expect(blocked(p[0], p[2], 0.35, clear)).toBe(false)
+          for (const f of office.footprints) if (Math.hypot(f.x - m.at[0], f.z - m.at[2]) > 2) expect(Math.hypot(f.x - p[0], f.z - p[2])).toBeGreaterThan(f.r)
+        }
+        expect(m.bars.length).toBe(3)
+        expect(office.sofas.length).toBeGreaterThan(0)
+      })
+
+      it('dealt: a presenter with attendees, and one asleep on the best-seen sofa', () => {
+        const crowd = newCrowd(spots, 20, 1, 0, steam, boards)
+        expect(crowd.people.filter((p) => p.task === 'present').length).toBe(1)
+        expect(crowd.people.filter((p) => p.task === 'meet').length).toBe(3)
+        expect(crowd.people.filter((p) => p.task === 'sleep').length).toBe(1)
+        // With few people the meeting needs at least the presenter and one more.
+        expect(newCrowd(spots, 1, 1, 0, steam, boards).people.some((p) => p.task === 'present')).toBe(false)
+      })
+
+      it('the chart drops when the camera looks at the board; the sleeper jerks awake when seen', () => {
+        const crowd = newCrowd(spots, 20, 1, 0, steam, boards)
+        const board = boards[0]!
+        const eye: Vec3 = [board[0] + 7, 1.6, board[2]]
+        let started = -1
+        for (let now = 0; now < 1.5 && started < 0; now += 0.1) {
+          stepCrowd(crowd, now, grid, { eye, dir: [-1, 0] })
+          if (crowd.meetAt[0]! > -Infinity) started = now
+        }
+        // Coffee may go first (it is the bigger gag) if it is in the same view; then the board.
+        for (let now = 1.5; now < 12 && started < 0; now += 0.1) {
+          stepCrowd(crowd, now, grid, { eye, dir: [-1, 0] })
+          if (crowd.meetAt[0]! > -Infinity) started = now
+        }
+        expect(started).toBeGreaterThanOrEqual(0)
+        const sleeper = crowd.people.find((p) => p.task === 'sleep')!
+        const sofa = crowd.spots[sleeper.spot]!.at
+        const fresh = newCrowd(spots, 20, 1, 0, steam, boards)
+        const s2 = fresh.people.find((p) => p.task === 'sleep')!
+        for (let now = 0; now < 12 && !Number.isFinite(s2.bonkAt); now += 0.1) {
+          stepCrowd(fresh, now, grid, { eye: [sofa[0] + 6, 1.6, sofa[2] + 0.5], dir: [-1, 0] })
+        }
+        expect(Number.isFinite(s2.bonkAt)).toBe(true)
+      })
+
+      it('poses: lying on the sofa (feet to head along the seat, on top of it), sane through every gag', () => {
+        const crowd = newCrowd(spots, 20, 1, 0, steam, boards)
+        const i = crowd.people.findIndex((p) => p.task === 'sleep')
+        const seat = crowd.spots[crowd.people[i]!.spot]!
+        const pose = poseOf(crowd, i, 3)
+        expect(pose.lieX).toBeCloseTo(-Math.PI / 2, 6)
+        expect(pose.at[1]).toBeGreaterThan(seat.at[1])
+        expect(Math.hypot(pose.at[0] - seat.at[0], pose.at[2] - seat.at[2])).toBeCloseTo(0.89, 2)
+        crowd.meetAt[0] = 10
+        crowd.people[i]!.bonkAt = 10
+        let prev = crowd.people.map((_, k) => poseOf(crowd, k, 10))
+        for (let now = 10; now < 17; now += 1 / 60) {
+          const poses = crowd.people.map((_, k) => poseOf(crowd, k, now))
+          poses.forEach((p, k) => {
+            for (const v of [...p.at, p.yaw, p.lift, p.torsoX, p.armLZ, p.armRZ, p.foreL]) expect(Number.isFinite(v)).toBe(true)
+            if (['present', 'meet', 'sleep'].includes(crowd.people[k]!.task)) {
+              for (const key of ['torsoX', 'armLZ', 'armRZ', 'foreL', 'foreR', 'headY'] as const) {
+                expect(Math.abs(p[key] - prev[k]![key]), `${crowd.people[k]!.task} ${key} at ${now.toFixed(2)}`).toBeLessThan(0.35)
+              }
+            }
+          })
+          prev = poses
+        }
+        expect(meetTime(crowd, 0, 10 + MEET.total + 0.1)).toBeNull()
+      })
     })
 
     it('chatting never jumps between poses (speaker ↔ listener blend)', () => {

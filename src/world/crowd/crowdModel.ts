@@ -19,8 +19,16 @@
 import { seeded } from '@/lib/random'
 import type { Vec3, WorldLayout } from '../layout'
 import { seenFrom, type Office } from '../officeModel'
-import type { FloorGroup } from './floorModel'
+import { SOFA, type FloorGroup } from './floorModel'
 import { alongPath, areaOf, findPath, pathLength, walkable, type NavGrid } from './navGrid'
+
+/**
+ * The meeting's gag (s from its start): the presenter taps the chart, its bars drop off one by
+ * one, the presenter clutches their head while the others applaud; the bars are back at `back`.
+ */
+export const MEET = { tap: 0.8, dropEach: 0.3, fall: 0.7, dismay: [2.0, 3.6] as const, back: 5.6, total: 6 } as const
+/** The sleeper's gag (s): snores harder, jerks up to sitting, looks around, flops back. */
+export const JOLT = { snore: 0.9, up: 0.25, look: 1.4, down: 0.6, total: 3.2 } as const
 
 export const CROWD = {
   /** Someone sets off every this many seconds (random in the range). */
@@ -40,6 +48,10 @@ export const CROWD = {
   shakeTime: 1.1,
   burstTime: 2.6,
   burstCooldown: 10,
+  /** The meeting: the chart gag (MEET timings) again only after `meetCooldown` (s). */
+  meetCooldown: 12,
+  /** The sleeper: the jolt awake (JOLT timings) again only after `joltCooldown` (s). */
+  joltCooldown: 14,
   /** The camera is called to look at most every this many seconds; a bang calls it this often. */
   attentionGap: 7,
   bonkAttention: 0.6,
@@ -52,8 +64,11 @@ export const CROWD = {
   exitBack: [1.5, 1.8, 2.1] as const,
 } as const
 
-/** Desk: typing. Coffee: chatting at a corner. Floor: chatting on the route's floor. Pace: on the phone, up and down. */
-export type SpotKind = 'desk' | 'coffee' | 'floor' | 'pace'
+/**
+ * Desk: typing. Coffee: chatting at a corner. Floor: chatting on the route's floor. Pace: on the
+ * phone, up and down. Present / meet: a stand-up meeting at a whiteboard (E2b). Sleep: on a sofa.
+ */
+export type SpotKind = 'desk' | 'coffee' | 'floor' | 'pace' | 'present' | 'meet' | 'sleep'
 
 export interface Spot {
   kind: SpotKind
@@ -70,6 +85,10 @@ export interface Spot {
   seen: number
   /** Pace: the other end of the walk. */
   end?: Vec3
+  /** Present / meet: which meeting corner. */
+  meeting?: number
+  /** Sleep: a sofa the crowd draws itself (on the route's floor, floorModel.ts). */
+  couch?: boolean
 }
 
 export interface Look {
@@ -79,7 +98,7 @@ export interface Look {
   hair: string
 }
 
-export type Task = 'type' | 'chat' | 'pace' | 'standUp' | 'walk' | 'sitDown'
+export type Task = 'type' | 'chat' | 'pace' | 'present' | 'meet' | 'sleep' | 'standUp' | 'walk' | 'sitDown'
 
 export interface Person {
   look: Look
@@ -93,7 +112,7 @@ export interface Person {
   to: number
   path: Vec3[]
   length: number
-  /** Desk: when the last / current head-bang started (scene time). */
+  /** Desk: when the last / current head-bang started; sofa: the last / current jolt awake. */
   bonkAt: number
 }
 
@@ -122,6 +141,9 @@ export interface Crowd {
   /** Per coffee corner: when the machine started shaking last (scene time) and its top. */
   burstAt: number[]
   steam: Vec3[]
+  /** Per meeting corner: when the chart gag started last (scene time), and the board's centre. */
+  meetAt: number[]
+  boards: Vec3[]
   /** The last gag, and the last one that called the camera (scene time). */
   lastGag: number
   lastAttention: number
@@ -133,12 +155,22 @@ const SHIRT = ['#ff6b5b', '#3b6cf6', '#2bb673', '#ffb703', '#9b5de5', '#ef476f',
 const PANTS = ['#26323f', '#1f2433', '#3d405b', '#023047', '#5c4033', '#2b2d42']
 const HAIR = ['#141414', '#3a2618', '#8a5a2b', '#c0392b', '#d9b26b', '#5a3420']
 
+const TASK_OF: Record<SpotKind, Task> = {
+  desk: 'type',
+  coffee: 'chat',
+  floor: 'chat',
+  pace: 'pace',
+  present: 'present',
+  meet: 'meet',
+  sleep: 'sleep',
+}
+
 const pick = <T>(rand: () => number, list: readonly T[]): T => list[Math.floor(rand() * list.length)]!
 const between = (rand: () => number, [a, b]: readonly [number, number]) => a + rand() * (b - a)
 
 /** Every spot of an office: each desk chair, and both places at each coffee corner. */
 export function crowdSpots(
-  office: Pick<Office, 'chairs' | 'coffee' | 'frosted'>,
+  office: Pick<Office, 'chairs' | 'coffee' | 'frosted'> & Partial<Pick<Office, 'meeting' | 'sofas' | 'footprints'>>,
   layout: Pick<WorldLayout, 'rail' | 'stations'>,
   grid: NavGrid,
   floor: FloorGroup[] = [],
@@ -180,10 +212,27 @@ export function crowdSpots(
       spots.push({ kind: 'coffee', at: sp.at, yaw: sp.yaw, exit, facesRoute: true, corner, seen: seenFrom(sp.at, stations, office.frosted) })
     }
   })
+  // The stand-up meeting (E2b): a presenter at the board, three around the table (they stay).
+  ;(office.meeting ?? []).forEach((m, meeting) => {
+    const seen = seenFrom(m.presenter.at, stations, office.frosted)
+    spots.push({ kind: 'present', at: m.presenter.at, yaw: m.presenter.yaw, exit: null, facesRoute: true, corner: -1, seen, meeting })
+    for (const a of m.attendees) spots.push({ kind: 'meet', at: a.at, yaw: a.yaw, exit: null, facesRoute: true, corner: -1, seen, meeting })
+  })
+  // Sofas (E2b): someone may sleep on one (lying along the seat).
+  for (const s of office.sofas ?? []) {
+    // Not behind other furniture (the sofa's own footprint is next to the seat: not counted).
+    const seen = seenFrom(s.seat, stations, office.frosted, office.footprints)
+    spots.push({ kind: 'sleep', at: s.seat, yaw: s.yaw, exit: null, facesRoute: true, corner: -1, seen })
+  }
   // On the route's floor (floorModel.ts): they stay where they are (no exit).
   for (const g of floor) {
     const [a, b] = g.points
     const ab = Math.atan2(b[0] - a[0], b[2] - a[2])
+    if (g.kind === 'sofa') {
+      // Seen first of all sofas (seen 0): the sleeper goes here.
+      spots.push({ kind: 'sleep', at: [a[0], SOFA.seat, a[2]], yaw: g.yaw ?? 0, exit: null, facesRoute: true, corner: -1, seen: 0, couch: true })
+      continue
+    }
     if (g.kind === 'pair') {
       spots.push({ kind: 'floor', at: a, yaw: ab, exit: null, facesRoute: true, corner: -1, seen: 0 })
       spots.push({ kind: 'floor', at: b, yaw: ab + Math.PI, exit: null, facesRoute: true, corner: -1, seen: 0 })
@@ -198,7 +247,7 @@ export function crowdSpots(
  * Deal the people for one page view: a pair at a coffee corner (if there is one), the rest at
  * desks — mostly ones that face the route, so their faces are seen.
  */
-export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, steam: Vec3[] = []): Crowd {
+export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, steam: Vec3[] = [], boards: Vec3[] = []): Crowd {
   const rand = seeded(seed)
   const people: Person[] = []
   const taken = new Set<number>()
@@ -209,7 +258,7 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
       look: { skin: pick(rand, SKIN), shirt: pick(rand, SHIRT), pants: pick(rand, PANTS), hair: pick(rand, HAIR) },
       phase: rand() * Math.PI * 2,
       spot,
-      task: kind === 'desk' ? 'type' : kind === 'pace' ? 'pace' : 'chat',
+      task: TASK_OF[kind],
       since: now - rand() * 5,
       to: -1,
       path: [],
@@ -217,7 +266,15 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
       bonkAt: -Infinity,
     })
   }
-  const quiet = { burstAt: steam.map(() => -Infinity), steam, lastGag: -Infinity, lastAttention: -Infinity, rand }
+  const quiet = {
+    burstAt: steam.map(() => -Infinity),
+    steam,
+    meetAt: boards.map(() => -Infinity),
+    boards,
+    lastGag: -Infinity,
+    lastAttention: -Infinity,
+    rand,
+  }
   if (count <= 0) return { spots, people, nextMove: Infinity, ...quiet }
   // First the ones on the route's floor (in the camera's sharp zone), then the coffee, then desks.
   spots.forEach((s, i) => {
@@ -231,6 +288,15 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
   }
   // Desks the camera sees from a stop, the nearer the likelier; mostly ones facing the route
   // (3 in 4), so the faces are seen over the screens. Never two at one desk cluster's same side.
+  // The meeting (presenter first) if it is seen at all, and one sleeper on the best-seen sofa.
+  spots.forEach((s, i) => {
+    if (s.kind === 'present' && Number.isFinite(s.seen) && count - people.length >= 2) seat(i)
+  })
+  spots.forEach((s, i) => {
+    if (s.kind === 'meet' && people.some((p) => spots[p.spot]!.kind === 'present' && spots[p.spot]!.meeting === s.meeting) && people.length < count) seat(i)
+  })
+  const sofas = spots.map((s, i) => [s, i] as const).filter(([s]) => s.kind === 'sleep' && Number.isFinite(s.seen))
+  if (sofas.length && people.length < count) seat([...sofas].sort((a, b) => a[0].seen - b[0].seen)[0]![1])
   const desks = spots.map((s, i) => [s, i] as const).filter(([s]) => s.kind === 'desk' && Number.isFinite(s.seen))
   const weigh = (list: (readonly [Spot, number])[]) => {
     let total = 0
@@ -307,6 +373,26 @@ function startGag(c: Crowd, now: number, view: View): Attention | null {
     c.lastGag = now
     const top = c.steam[best]!
     return call({ at: [top[0], top[1] + 0.2, top[2]], start, dur: CROWD.shakeTime + 1.8 })
+  }
+  // The meeting's chart drops off the board.
+  for (let k = 0; k < c.boards.length; k++) {
+    if (now - c.meetAt[k]! < MEET.total + CROWD.meetCooldown) continue
+    if (!c.people.some((p) => p.task === 'present' && c.spots[p.spot]!.meeting === k)) continue
+    if (inView(view, c.boards[k]!, CROWD.gagView.burst) === Infinity) continue
+    const start = now + CROWD.lead
+    c.meetAt[k] = start
+    c.lastGag = now
+    return call({ at: c.boards[k]!, start, dur: MEET.dismay[1] })
+  }
+  // The sleeper jerks awake.
+  for (const p of c.people) {
+    if (p.task !== 'sleep' || now - p.bonkAt < JOLT.total + CROWD.joltCooldown) continue
+    const at = c.spots[p.spot]!.at
+    if (inView(view, at, CROWD.gagView.burst) === Infinity) continue
+    const start = now + CROWD.lead
+    p.bonkAt = start
+    c.lastGag = now
+    return call({ at: [at[0], at[1] + 0.5, at[2]], start, dur: JOLT.total - 0.4 }, p)
   }
   // A head-bang: the nearest typist in view who has not banged lately.
   let who: Person | null = null
@@ -414,6 +500,12 @@ export function stepCrowd(c: Crowd, now: number, grid: NavGrid, view?: View): At
     return attention
   }
   return attention
+}
+
+/** Seconds into the meeting's chart gag at corner `k`, or null. */
+export function meetTime(c: Crowd, k: number, now: number): number | null {
+  const at = c.meetAt[k]
+  return at === undefined || now < at || now >= at + MEET.total ? null : now - at
 }
 
 /**
