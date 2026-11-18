@@ -125,7 +125,10 @@ export const useExperience = create<ExperienceState>((set, get) => ({
   },
   setHandedOver: (handedOver) => {
     if (get().handedOver === handedOver) return
-    set({ handedOver, rippleAt: performance.now(), rippleCenter: null })
+    // Back in 2D at the top (scrolled up, or out of the monitor, E5): the next way in is through
+    // the film, not out of the portal's arrival door — it would stand in front of the hero.
+    const leftDoor = !handedOver && get().arrivedVia !== null ? { arrivedVia: null } : {}
+    set({ handedOver, rippleAt: performance.now(), rippleCenter: null, ...leftDoor })
   },
   ripple: (center) => set({ rippleAt: performance.now(), rippleCenter: center ?? null }),
   setNavigate: (navigate) => set({ navigate }),

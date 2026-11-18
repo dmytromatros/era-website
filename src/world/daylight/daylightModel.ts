@@ -1,16 +1,16 @@
 /**
  * Time of day behind the office windows (wow-plan E6): the visitor's own clock picks morning,
  * day, sunset or evening, and the office light follows — the sun's colour, strength and height,
- * the sky / ground light (the hemisphere light IS the sky gradient on every lit surface), the
- * colour of the windows, warm ceiling lamps in the evening, the air (fog) and a tint of the
- * unlit floor. Pure: no React, no scene — the runtime (<Atmosphere>) blends these numbers in.
+ * the colour of the windows, and the ceiling lamps coming on as it gets dark (OUTDOOR); the
+ * office inside keeps the theme's light, air and floor. Pure: no React, no scene — the runtime
+ * (<Atmosphere>) blends these numbers in.
  *
  * Costs nothing on the GPU: only light colours, intensities, a light direction and material
  * colours change — uniforms, never defines, so no shader is compiled for it, ever.
  *
- * `day` IS the theme as it always was (taken from the theme, not copied here), so at midday
- * the office looks exactly as before. The others are blended in only with the entrance (the
- * film tear, like the style: `DAY_FADE`), so the frame of the 2D → 3D swap is never touched.
+ * `day` IS the theme's light as it always was (taken from the theme, not copied here) — only
+ * the lamps are off by day (Dima 2026-11-18: they come on when it gets dark). It is on at once
+ * from the handover (the office is still behind the whole film in that frame).
  */
 import * as THREE from 'three'
 import type { Theme } from '@/theme/tokens'
@@ -54,51 +54,52 @@ export function baseLook(world: Theme['world']): DayLook {
 }
 
 /**
- * The other three times (light theme; the dark theme is the "night office" already and keeps
- * its own light). Kept bright enough that cards and characters stay readable: the darkest
- * (evening) still lights a white card well above its text.
+ * What changes with the time of day — only what comes from OUTSIDE (Dima 2026-11-18: "if the
+ * colour from the windows changes, the lamps' colour should not"; the first version tinted the
+ * whole office — sky light, fog, floor, warm lamps — and it all went brown): the sun (colour,
+ * strength, how low), the windows, and whether the ceiling lamps are on (`lampsOn` 0…1: off in
+ * the morning and by day, coming on at sunset as it gets darker, on in the evening — always the
+ * theme's own lamp colour, never tinted). Inside stays the theme's: the sky / ground light, the
+ * air (fog and background) and the floor. The evening only dims the sky light a little and cools
+ * the shade, as the light now comes from the lamps.
  */
-export const LOOKS: Record<Exclude<TimeName, 'day'>, DayLook> = {
-  // Fresh and pale: a soft golden sun low from the side, cool sky, apricot dawn in the windows.
-  morning: {
-    sun: '#ffe2b5',
-    sunIntensity: 1.35,
-    sunPos: [11, 8, 5],
-    hemiSky: '#e8f0ff',
-    hemiGround: '#d9cfc2',
-    hemiIntensity: 1.5,
-    window: '#fde6cc',
-    lamp: '#ffffff',
-    air: '#f1eee8',
-    floor: '#fff4e6',
-  },
-  // Golden hour: an orange sun almost level, warm sky, violet shade, orange windows.
-  sunset: {
-    sun: '#ff9a52',
-    sunIntensity: 1.55,
-    sunPos: [12, 5, 6],
-    hemiSky: '#ffc7a0',
-    hemiGround: '#9b7f8c',
-    hemiIntensity: 1.3,
-    window: '#ffa768',
-    lamp: '#ffe3b3',
-    air: '#ead2c0',
-    floor: '#ffe4cc',
-  },
-  // Dark blue windows, warm lamps: the directional light becomes the lamps' warm light from
-  // above, the sky light dims and the shade turns blue — screens and the arcade (unlit) glow.
-  evening: {
-    sun: '#ffcf90',
-    sunIntensity: 1.15,
-    sunPos: [4, 12, 6],
-    hemiSky: '#efcf9f',
-    hemiGround: '#4c4864',
-    hemiIntensity: 0.95,
-    window: '#22305a',
-    lamp: '#ffd88a',
-    air: '#4f4b5f',
-    floor: '#a8978a',
-  },
+export interface Outdoor {
+  sun?: string
+  sunIntensity?: number
+  sunPos?: [number, number, number]
+  window?: string
+  hemiGround?: string
+  hemiIntensity?: number
+  lampsOn: number
+}
+
+export const OUTDOOR: Record<TimeName, Outdoor> = {
+  // A soft golden sun low from the side, apricot dawn in the windows; lamps off.
+  morning: { sun: '#ffe2b5', sunIntensity: 1.35, sunPos: [11, 8, 5], window: '#fde6cc', lampsOn: 0 },
+  // The theme's own daylight; lamps off.
+  day: { lampsOn: 0 },
+  // Golden hour: an orange sun almost level through the windows, orange windows; the lamps come on.
+  sunset: { sun: '#ff9a52', sunIntensity: 1.55, sunPos: [12, 5, 6], window: '#ffa768', lampsOn: 0.7 },
+  // Dark blue windows; the light comes from the lamps above (white, as the lamps), a cooler shade.
+  evening: { sun: '#fffaf2', sunIntensity: 1.05, sunPos: [4, 12, 6], window: '#22305a', hemiGround: '#7a7f96', hemiIntensity: 1.25, lampsOn: 1 },
+}
+
+/** A ceiling lamp that is off: its diffuser, a little greyer than the lit panel (not glowing). */
+export const lampOff = (lamp: string) => mixHex(lamp, '#cfd2d4', 0.45)
+
+/** The full look of `name`: the theme inside, the time's outdoors on top. */
+export function looksOf(name: TimeName, base: DayLook): DayLook {
+  const o = OUTDOOR[name]
+  return {
+    ...base,
+    ...(o.sun !== undefined && { sun: o.sun }),
+    ...(o.sunIntensity !== undefined && { sunIntensity: o.sunIntensity }),
+    ...(o.sunPos !== undefined && { sunPos: o.sunPos }),
+    ...(o.window !== undefined && { window: o.window }),
+    ...(o.hemiGround !== undefined && { hemiGround: o.hemiGround }),
+    ...(o.hemiIntensity !== undefined && { hemiIntensity: o.hemiIntensity }),
+    lamp: mixHex(lampOff(base.lamp), base.lamp, o.lampsOn),
+  }
 }
 
 /**
@@ -119,11 +120,6 @@ export const SCHEDULE: readonly (readonly [number, TimeName])[] = [
 /** The hour `?time=<name>` shows: the middle of each time. */
 export const TIME_HOUR: Record<TimeName, number> = { morning: 7.75, day: 13, sunset: 19, evening: 23 }
 
-/**
- * The film tear (entrance progress) over which the time of day fades in — the same span as the
- * style's outlines and grade (effects/Effects.tsx), so the tear hides both.
- */
-export const DAY_FADE = { from: 0.15, to: 0.45 } as const
 
 /** Re-read the visitor's clock this often (ms); a blend lasts an hour or more. */
 export const CLOCK_EVERY_MS = 20_000
@@ -186,11 +182,10 @@ export function blendLook(a: DayLook, b: DayLook, t: number): DayLook {
   }
 }
 
-/** The look at `hour`, with `day` = the theme's own light. */
+/** The look at `hour` (inside: the theme's own; lamps on only as it gets dark). */
 export function lookAt(hour: number, base: DayLook): DayLook {
-  const of = (name: TimeName) => (name === 'day' ? base : LOOKS[name])
   const { from, to, t } = phaseAt(hour)
-  return blendLook(of(from), of(to), t)
+  return blendLook(looksOf(from, base), looksOf(to, base), t)
 }
 
 /** Relative luminance of a colour in linear light (what the toon shader measures). */

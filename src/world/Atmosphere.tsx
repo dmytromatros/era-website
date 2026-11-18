@@ -3,13 +3,12 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { live, useExperience } from '@/experience/store'
+import { useExperience } from '@/experience/store'
 import { useTheme, useThemeStore } from '@/theme/store'
 import { dayFrame } from './daylight/dayFrame'
 import {
   baseLook,
   CLOCK_EVERY_MS,
-  DAY_FADE,
   hourOf,
   lookAt,
   parseTime,
@@ -18,7 +17,6 @@ import {
   type DayLook,
 } from './daylight/daylightModel'
 import { useQualitySettings } from './quality'
-import { entranceAt } from './timeline'
 import { toonSun } from './toonMaterial'
 
 /** `?time=morning|day|sunset|evening` or an hour (`?time=18.25`) — fixed for the visit. */
@@ -29,9 +27,11 @@ const c = new THREE.Color()
 /**
  * Background, fog and lights — from the current theme, and the time of day of the visitor's
  * clock over it (E6, daylight/daylightModel.ts): sun, sky light, air, and — through `dayFrame` —
- * windows, ceiling lamps and the floor. The time fades in with the film tear like the style
- * (DAY_FADE), so the 2D → 3D swap frame is untouched; the dark theme ("night office") keeps
- * its own light. Only colours, intensities and the light direction change: no shader compiles.
+ * windows, ceiling lamps and the floor. On at once from the handover (Dima 2026-11-18: "can it be
+ * the right colour straight away, not later?" — it used to fade in with the film tear): the swap
+ * frame is untouched all the same, as the office is still behind the whole film then and the
+ * hero's twins are unlit, and only outdoor light changes (no air, floor, background). The dark
+ * theme ("night office") keeps its own light. Only colours, intensities and the light direction change: no shader compiles.
  */
 export function Atmosphere() {
   const { world } = useTheme()
@@ -88,11 +88,10 @@ export function Atmosphere() {
       dayFrame.floor.set(look.floor)
       changed = true
     }
-    // 0 until the handover and at the top, grows with the film tear (live.progress is already
-    // smoothed, rule 1), like the style in Effects.tsx. The dark theme keeps its own light.
-    const entrance = Math.min(Math.max(entranceAt(live.progress), 0), 1)
+    // All of it from the handover on (the office is behind the whole film at that frame); 0 on
+    // the 2D landing. The dark theme keeps its own light.
     const on = daylight && themeName === 'light' && useExperience.getState().handedOver
-    const mix = on ? THREE.MathUtils.smoothstep(entrance, DAY_FADE.from, DAY_FADE.to) : 0
+    const mix = on ? 1 : 0
     if (mix !== s.mix) changed = true
     if (!changed) return
     s.mix = mix

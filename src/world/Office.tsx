@@ -242,7 +242,7 @@ export function Office({
     daySeen.current = dayFrame.version
   }, [materials, o])
   // The time of day (E6, set by <Atmosphere> each frame): unlit windows show the sky, the ceiling
-  // lamps turn warm in the evening. Two colour writes, only when the time or the fade moved.
+  // lamps are off by day and come on as it gets dark (their own colour, never tinted). Two colour writes, only when the time or the fade moved.
   useFrame(() => {
     if (daySeen.current === dayFrame.version) return
     daySeen.current = dayFrame.version

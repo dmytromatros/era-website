@@ -7,6 +7,7 @@ import { phaseOf } from '@/actors/Actor'
 import { HOLDING_RATE } from '@/actors/activities'
 import { Door3D } from '@/blocks/door/Door3D'
 import { DOOR_SPACING, hrefOfSceneKey, portalDoors } from '@/blocks/door/doors'
+import { monitorSpot } from './monitor/monitorModel'
 import type { SceneData } from '@/experience/store'
 import { useExperience } from '@/experience/store'
 import { CameraRig } from './CameraRig'
@@ -61,6 +62,17 @@ export function SceneContent({ scene }: { scene: SceneData }) {
   const plan = useMemo(() => routePlan(page), [page])
   const timing = useMemo(() => planTiming(plan), [plan])
 
+  // The portal hall the monitor (E5) stands by: the first door stop of the home page only (Dima
+  // 2026-11-18: "if it is simpler, only on the home page" — it shows and leads to its own top).
+  // Desktop only (Dima 2026-11-18): a portrait frame holds just the exhibit — beside the doors the
+  // monitor would always be off the screen, so it does not stand there at all.
+  const isHome = scene.key === `${locale}/`
+  const wide = size.width >= size.height
+  const monitorHall = useMemo(
+    () => (scene.monitor && isHome && wide ? plan.stops.findIndex((stop) => page.blocks[stop.blockIndex]!.type === 'door') : -1),
+    [scene.monitor, isHome, wide, plan, page],
+  )
+
   const world = useMemo(() => {
     if (!measured) return null
     const models: (ExhibitModel | null)[] = plan.stops.map((stop) => {
@@ -102,7 +114,13 @@ export function SceneContent({ scene }: { scene: SceneData }) {
         kinetic: spec.id === KINETIC_ELEMENT ? kinetic : undefined,
       }))
     })
-    const office = buildOffice(layout, style.seed, size.width / size.height)
+    // The monitor (E5) by the portal hall, to the side of its doors (monitorModel.ts `monitorSpot`).
+    const hallBlock = monitorHall >= 0 ? page.blocks[plan.stops[monitorHall]!.blockIndex] : undefined
+    const hallWidth = hallBlock?.type === 'door' ? hallSize(Math.max(portalDoors(hallBlock, nav, currentHref).length, 1)).width : 0
+    // Halfway (by depth) from the doors to the character of the stop before them.
+    const before = monitorHall > 0 ? models[monitorHall - 1] : null
+    const guy = before?.helpers[0] ? toWorld(before.helpers[0].local, layout.stations[monitorHall - 1]!.anchor, layout.stations[monitorHall - 1]!.yaw) : undefined
+    const office = buildOffice(layout, style.seed, size.width / size.height, monitorSpot(layout, monitorHall, hallWidth, guy))
 
     // ---- props you can push (C2): beside the exhibits, plus the static world they hit ----
     const exhibits: StopExhibit[] = models.map((m, i) => {
@@ -113,6 +131,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
         helpers: m ? m.helpers.map((h) => toWorld(h.local, st.anchor, st.yaw)) : [],
       }
     })
+    // The monitor (E5) stands by a stop's exhibit like a character: props and people keep off it.
+    for (const m of office.monitor) exhibits[m.station]?.helpers.push(m.at)
     const skip = plan.stops.flatMap((stop, i) => (i === 0 || page.blocks[stop.blockIndex]!.type === 'door' ? [i] : []))
     const spots = placeProps(layout, office, exhibits, style.seed, skip, size.width / size.height)
     const bodies = propBodies(spots, style.seed)
@@ -153,7 +173,7 @@ export function SceneContent({ scene }: { scene: SceneData }) {
     // People standing on the route's floor (E2a) keep clear of the same exhibits, helpers and props.
     const floor = { exhibits, props: spots, skip, aspect: size.width / size.height }
     return { models, layout, transit, office, physics, floor }
-  }, [measured, plan, timing, page, k, size, nav, currentHref, style.seed, actors])
+  }, [measured, plan, timing, page, k, size, nav, currentHref, style.seed, actors, monitorHall])
 
   if (!world) return <Membrane />
 

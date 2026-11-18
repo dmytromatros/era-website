@@ -89,8 +89,12 @@ export function Monitor({
 
   // What stands in the way of a flight: furniture, columns, the exhibits (cards).
   const blockers = useMemo(
-    () => [...office.footprints, ...layout.stations.map((st) => ({ x: st.anchor[0], z: st.anchor[2], r: 2.4 }))],
-    [office, layout],
+    // (Not the exhibits it stands between: the stop that sees it and the portal hall.)
+    () => [
+      ...office.footprints,
+      ...layout.stations.flatMap((st, i) => (i === desk.station || i === desk.hall ? [] : [{ x: st.anchor[0], z: st.anchor[2], r: 2.4 }])),
+    ],
+    [office, layout, desk.station, desk.hall],
   )
 
   // Esc turns a flight round; leaving the page (a portal, the menu) ends it.

@@ -4,10 +4,11 @@ import { themes } from '@/theme/tokens'
 import {
   baseLook,
   blendLook,
-  DAY_FADE,
   hourOf,
   lightLuma,
-  LOOKS,
+  looksOf,
+  lampOff,
+  OUTDOOR,
   lookAt,
   parseTime,
   phaseAt,
@@ -92,8 +93,11 @@ describe('time of day from the clock (E6)', () => {
 })
 
 describe('the light of each time (E6)', () => {
-  it('day is exactly the theme as it always was', () => {
-    expect(lookAt(13, base)).toEqual(base)
+  const LOOKS = { morning: looksOf('morning', base), sunset: looksOf('sunset', base), evening: looksOf('evening', base) }
+
+  it('day is the theme as it always was — but with the lamps off', () => {
+    expect({ ...lookAt(13, base), lamp: base.lamp }).toEqual(base)
+    expect(lookAt(13, base).lamp).toBe(lampOff(base.lamp))
     expect(base.sun).toBe(themes.light.world.sun)
     expect(base.sunIntensity).toBe(themes.light.world.sunIntensity)
     expect(base.window).toBe(themes.light.world.office.window)
@@ -102,18 +106,35 @@ describe('the light of each time (E6)', () => {
     expect(base.floor).toBe('#ffffff')
   })
 
-  it('sunset is warmer and lower than day, evening darker with warm lamps', () => {
+  it('only the outdoors changes: the air, the floor and the sky light stay the theme’s (Dima 2026-11-18)', () => {
+    for (const look of Object.values(LOOKS)) {
+      expect(look.air).toBe(base.air)
+      expect(look.floor).toBe(base.floor)
+      expect(look.hemiSky).toBe(base.hemiSky)
+    }
+    expect(LOOKS.morning.hemiIntensity).toBe(base.hemiIntensity)
+    expect(LOOKS.sunset.hemiIntensity).toBe(base.hemiIntensity)
+  })
+
+  it('the lamps: off by day and in the morning, coming on at sunset, on in the evening — never tinted', () => {
+    expect(LOOKS.morning.lamp).toBe(lampOff(base.lamp))
+    expect(LOOKS.evening.lamp).toBe(base.lamp)
+    expect(OUTDOOR.sunset.lampsOn).toBeGreaterThan(0)
+    expect(OUTDOOR.sunset.lampsOn).toBeLessThan(1)
+    expect(lightLuma(lampOff(base.lamp))).toBeLessThan(lightLuma(base.lamp))
+    // off is the same hue, only greyer: no warm cast
+    expect(warmth(lampOff(base.lamp))).toBeLessThan(1.1)
+  })
+
+  it('sunset is warmer and lower than day, evening dark outside', () => {
     const { sunset, evening, morning } = LOOKS
     expect(warmth(sunset.sun)).toBeGreaterThan(warmth(base.sun) * 2)
     expect(warmth(sunset.window)).toBeGreaterThan(warmth(base.window) * 2)
     expect(sunset.sunPos[1]).toBeLessThan(base.sunPos[1])
     expect(morning.sunPos[1]).toBeLessThan(base.sunPos[1])
-    // evening: dark windows, lamps far brighter than the sky, and warm
     expect(lightLuma(evening.window)).toBeLessThan(0.05)
     expect(lightLuma(evening.lamp)).toBeGreaterThan(lightLuma(evening.window) * 10)
-    expect(warmth(evening.lamp)).toBeGreaterThan(2)
     expect(evening.hemiIntensity).toBeLessThan(base.hemiIntensity)
-    expect(lightLuma(evening.floor)).toBeLessThan(lightLuma(base.floor))
   })
 
   it('evening still lights the office enough to read a card', () => {
@@ -147,10 +168,6 @@ describe('the light of each time (E6)', () => {
     expect(toonSunOf(LOOKS.sunset.sun, 1, base)).toBeLessThan(1)
   })
 
-  it('fades in over the film tear, like the style', () => {
-    expect(DAY_FADE.from).toBe(0.15)
-    expect(DAY_FADE.to).toBe(0.45)
-  })
 })
 
 describe('?time= (E6)', () => {

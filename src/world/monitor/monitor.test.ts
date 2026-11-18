@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { readPage, readSite } from '@/content/read'
 import { flightClear, flightWeight } from '../arcade/arcadeModel'
 import { ENTRANCE_GEOMETRY, layoutRoute, type Vec3 } from '../layout'
-import { ARCADE_CAB, blocked, buildOffice, MONITOR_DESK } from '../officeModel'
+import { buildOffice, MONITOR_DESK } from '../officeModel'
 import { routePlan } from '../route'
-import { MONITOR, monitorView, pageRect } from './monitorModel'
+import { toWorld } from '../exhibitModel'
+import { MONITOR, MONITOR_SPOT, monitorSpot, monitorView, pageRect } from './monitorModel'
 
 const t = Math.tan((ENTRANCE_GEOMETRY.fov * Math.PI) / 360)
 
@@ -73,17 +74,50 @@ for (const [name, aspect] of [
     const plan = routePlan(page)
     const sizes = plan.stops.map((s) => (s.exhibit ? { width: 4, height: 2.6 } : { width: 2.4, height: 3.6 }))
     const layout = layoutRoute(plan, sizes, aspect)
-    const office = buildOffice(layout, undefined, aspect)
+    // The portal hall (as wide as the test layout made it) and the stop before it.
+    const hallStop = plan.stops.findIndex((s) => page.blocks[s.blockIndex]!.type === 'door')
+    const before = layout.stations[hallStop - 1]!
+    const hallWidth = sizes[hallStop]!.width
+    // The character of that stop (the CTA's Mykola), at its side.
+    const guy = toWorld([1.6, 0, 0.3], before.anchor, before.yaw)
+    const spot = monitorSpot(layout, hallStop, hallWidth, guy)!
+    const office = buildOffice(layout, undefined, aspect, spot)
     const desk = office.monitor[0]!
     const view = monitorView(desk.screen, aspect)
-    const blockers = [...office.footprints, ...layout.stations.map((st) => ({ x: st.anchor[0], z: st.anchor[2], r: 2.4 }))]
+    const blockers = [
+      ...office.footprints,
+      ...layout.stations.flatMap((st, i) => (i === desk.station || i === desk.hall ? [] : [{ x: st.anchor[0], z: st.anchor[2], r: 2.4 }])),
+    ]
 
-    it('stands on free floor of the ground floor, in view of a stop', () => {
+    it('stands by the portal hall, to the side of its doors — the way to them free (Dima 2026-11-18)', () => {
       expect(desk).toBeDefined()
-      expect(desk.at[1]).toBe(0)
-      expect(blocked(desk.at[0], desk.at[2], MONITOR_DESK.footprint.r, office.keepOff)).toBe(false)
-      expect(desk.seen).toBeGreaterThanOrEqual(MONITOR_DESK.view[0])
-      expect(desk.seen).toBeLessThanOrEqual(MONITOR_DESK.view[1])
+      expect(desk.station).toBe(hallStop - 1)
+      expect(desk.hall).toBe(hallStop)
+      const h = layout.stations[hallStop]!
+      // On the hall's floor (a mezzanine too) and on it, not over its edge.
+      expect(desk.at[1]).toBeCloseTo(h.anchor[1], 6)
+      for (const m of layout.architecture.mezzanines.filter((m) => Math.abs(m.frame.level - h.anchor[1]) < 0.05)) {
+        const fw = [Math.sin(m.frame.heading), -Math.cos(m.frame.heading)]
+        const rt = [Math.cos(m.frame.heading), Math.sin(m.frame.heading)]
+        const dx = desk.at[0] - m.frame.origin[0]
+        const dz = desk.at[2] - m.frame.origin[2]
+        expect(Math.abs(dx * rt[0]! + dz * rt[1]!)).toBeLessThanOrEqual(m.half - 0.75)
+        expect(dx * fw[0]! + dz * fw[1]!).toBeLessThanOrEqual(m.to)
+      }
+      // Left of the hall (its local −x), beyond its edge: not in front of a door.
+      const c = Math.cos(h.yaw)
+      const sn = Math.sin(h.yaw)
+      const lx = (desk.at[0] - h.anchor[0]) * c - (desk.at[2] - h.anchor[2]) * sn
+      expect(lx).toBeLessThan(-(hallWidth / 2 + MONITOR_SPOT.min) + 1e-6)
+      // By depth halfway from the doors to the character (Dima: "between Mykola and the portals").
+      const lz = (p: Vec3) => (p[0] - h.anchor[0]) * sn + (p[2] - h.anchor[2]) * c
+      expect(lz(desk.at)).toBeCloseTo(Math.max(MONITOR_SPOT.forward, lz(guy) * MONITOR_SPOT.between), 6)
+      expect(lz(desk.at)).toBeLessThan(lz(guy))
+      // The screen faces the camera at the stop before the hall.
+      const vp = before.viewpoint
+      const dx = vp[0] - desk.screen.center[0]
+      const dz = vp[2] - desk.screen.center[2]
+      expect((dx * desk.screen.normal[0] + dz * desk.screen.normal[1]) / Math.hypot(dx, dz)).toBeGreaterThan(0.99)
     })
 
     it('the camera can fly in from the stop that sees it', () => {
@@ -91,9 +125,8 @@ for (const [name, aspect] of [
       expect(flightClear(from, desk, view.eye, layout.architecture.walls, blockers, MONITOR.reach)).toBe(true)
     })
 
-    it('keeps away from the arcade, the coffee and the meeting', () => {
+    it('the coffee and the meeting keep away from it', () => {
       const far = (p: Vec3) => Math.hypot(p[0] - desk.at[0], p[2] - desk.at[2])
-      for (const a of office.arcade) expect(far(a.at)).toBeGreaterThanOrEqual(Math.max(MONITOR_DESK.apart, ARCADE_CAB.apart) - 1e-9)
       for (const c of office.coffee) expect(far(c.at)).toBeGreaterThanOrEqual(MONITOR_DESK.apart)
       for (const m of office.meeting) expect(far(m.at)).toBeGreaterThan(MONITOR_DESK.apart - 1.5)
     })

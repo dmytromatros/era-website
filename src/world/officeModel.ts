@@ -113,6 +113,8 @@ export interface MonitorDesk {
   /** Index of the stop that sees it best, and from how far (m). */
   station: number
   seen: number
+  /** The portal hall's stop it stands by (E5). */
+  hall?: number
 }
 
 export interface Office {
@@ -548,8 +550,16 @@ function partition(w: Box, solid: Prim[], glass: Box[], frosted: Box[]) {
   glass.push({ center: at(0, 1.6 + (H - 1.68) / 2), size: sized(0.03, H - 1.68, length), yaw })
 }
 
-/** `aspect` (width / height of the screen) decides how wide the camera sees at a stop (E3). */
-export function buildOffice(layout: WorldLayout, seed = 11, aspect = 16 / 9): Office {
+/**
+ * `aspect` (width / height of the screen) decides how wide the camera sees at a stop (E3);
+ * `monitorAt`: where the monitor stands (E5, monitor/monitorModel.ts `monitorSpot`).
+ */
+export function buildOffice(
+  layout: WorldLayout,
+  seed = 11,
+  aspect = 16 / 9,
+  monitorAt?: { at: Vec3; face: Vec3; station: number; hall: number },
+): Office {
   const { walls, stairs, mezzanines, clear } = layout.architecture
   const solid: Prim[] = []
   const glass: Box[] = []
@@ -730,22 +740,17 @@ export function buildOffice(layout: WorldLayout, seed = 11, aspect = 16 / 9): Of
   // ---- the monitor showing the landing (E5), right after the arcade and the same way: in plain
   // view of a stop, the camera's way to it kept free; away from the arcade ----
   const monitor: MonitorDesk[] = []
-  const monBest = screenSpot({
-    ...MONITOR_DESK,
-    screen: MONITOR_DESK.screen.center,
-    eye: (c, n) => monitorEye(c, n, aspect),
-    ok: (at) => arcade.every((a) => Math.hypot(a.at[0] - at[0], a.at[2] - at[2]) >= MONITOR_DESK.apart),
-  })
-  if (monBest) {
-    const { at, yaw, station, seen } = monBest
-    const foot = placePoint(MONITOR_DESK.footprint.at, at, yaw)
-    placed.push({ x: foot[0], z: foot[2], r: MONITOR_DESK.footprint.r })
+  // The monitor stands on the portal hall's podium, across from the character of the stop before
+  // it (Dima 2026-11-18: "by the portals, it is empty there anyway" → "not in a row with the
+  // portals, just on the podium, opposite the guy, only on the left"). It faces the stop that sees
+  // it; it stands by the exhibits, so the route's clear floor does not exclude it (like a helper).
+  if (monitorAt) {
+    const { at, face, station, hall } = monitorAt
+    const yaw = Math.atan2(face[0] - at[0], face[2] - at[2])
     solid.push(...place(monitorDesk(), at, yaw))
     const normal: [number, number] = [Math.sin(yaw), Math.cos(yaw)]
     const screen = placePoint(MONITOR_DESK.screen.center, at, yaw)
-    monitor.push({ at, yaw, screen: { center: screen, size: MONITOR_DESK.screen.size, normal }, station, seen })
-    const vp = layout.stations[station]!.viewpoint
-    sight.push([vp, screen], [vp, monitorEye(screen, normal, aspect)])
+    monitor.push({ at, yaw, screen: { center: screen, size: MONITOR_DESK.screen.size, normal }, station, hall, seen: Math.hypot(face[0] - at[0], face[2] - at[2]) })
   }
 
   // The other gags keep their distance (they would pile up in one place).
