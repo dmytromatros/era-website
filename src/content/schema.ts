@@ -30,6 +30,11 @@ export const helperSchema = z.object({
   /** What the character does next to the element. */
   pose: z.enum(ACTIVITIES),
   lines: z.array(z.string().min(1)).min(1),
+  /**
+   * E4, for the one holding the hero heading up: what they mutter after putting back a letter the
+   * visitor knocked off it (one at a time, in turn). Absent = the letters cannot be knocked off.
+   */
+  grumbles: z.array(z.string().min(1)).min(1).max(8).optional(),
 })
 
 /**

@@ -87,6 +87,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
             zone: heroZone,
             segments: timing.segments,
             holder: heldBy ? { phase: phaseOf(heldBy.actor), rate: HOLDING_RATE } : null,
+            // E4: its letters can be knocked off if the holder has something to mutter about it.
+            knock: heldBy?.grumbles?.length && layout.stations[0] ? { floorY: layout.stations[0].anchor[1] } : undefined,
           }
         : undefined
     const transit: TransitItem[] = plan.stops.flatMap((stop, i) => {

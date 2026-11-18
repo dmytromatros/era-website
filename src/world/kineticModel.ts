@@ -60,6 +60,11 @@ export interface Glyph {
   kickAt: number
   /** Which way the kicked glyph spins: away from the tap. */
   kickDir: number
+  /** Half its width and height (local units): to hit-test a click on it (E4). */
+  hw: number
+  hh: number
+  /** Knocked off the heading (E4, letterFix): its offset is driven from outside, no spring. */
+  held: boolean
 }
 
 /** Glyph centres from troika's `textRenderInfo.glyphBounds` ([minX, minY, maxX, maxY] per glyph). */
@@ -78,7 +83,28 @@ export function glyphsFromBounds(bounds: ArrayLike<number>): Glyph[] {
     va: 0,
     kickAt: Infinity,
     kickDir: 1,
+    hw: (bounds[i * 4 + 2]! - bounds[i * 4]!) / 2,
+    hh: (bounds[i * 4 + 3]! - bounds[i * 4 + 1]!) / 2,
+    held: false,
   }))
+}
+
+/** The glyph under local point (x, y), with a little slack; -1 = none (a space, between lines). */
+export function glyphAt(glyphs: Glyph[], x: number, y: number, slack: number): number {
+  let best = -1
+  let bestD = Infinity
+  glyphs.forEach((g, i) => {
+    if (g.hw <= 0 || g.hh <= 0) return
+    const dx = Math.abs(x - g.cx) - g.hw
+    const dy = Math.abs(y - g.cy) - g.hh
+    if (dx > slack || dy > slack) return
+    const d = Math.hypot(x - g.cx, y - g.cy)
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  })
+  return best
 }
 
 export interface KineticInput {
@@ -102,6 +128,10 @@ export function stepGlyphs(glyphs: Glyph[], input: KineticInput, now: number, dt
   const reach = KINETIC.radius * size
   let moving = false
   for (const g of glyphs) {
+    if (g.held) {
+      moving = true
+      continue
+    }
     // Where the cursor wants this glyph to be (constant over the frame).
     let tx = 0
     let ty = 0
@@ -163,6 +193,8 @@ export function sway(g: Glyph, size: number, phase: number): { bob: number; tilt
 /**
  * Fill the shader's per-glyph arrays: `centers` (x, y of the rotation pivot) and `motion`
  * (offset x, y, z, tilt), everything scaled by `weight`. Glyphs past the end are zeroed.
+ * `sag` (0..1, E4): nobody holds the heading — it droops and leans (not the knocked-off letter);
+ * `wobble` is the time for its shake.
  */
 export function writeMotion(
   glyphs: Glyph[],
@@ -171,17 +203,25 @@ export function writeMotion(
   weight: number,
   size: number,
   holdPhase: number | null,
+  sag = 0,
+  wobble = 0,
+  sagDown = 0.32,
+  sagTilt = 0.05,
 ) {
   motion.fill(0)
+  const mid = glyphs.length ? (glyphs[0]!.cx + glyphs[glyphs.length - 1]!.cx) / 2 : 0
   for (let i = 0; i < glyphs.length; i++) {
     const g = glyphs[i]!
     centers[i * 4] = g.cx
     centers[i * 4 + 1] = g.cy
     if (weight <= 0) continue
-    const s = holdPhase === null ? { bob: 0, tilt: 0 } : sway(g, size, holdPhase)
+    const s = holdPhase === null || g.held ? { bob: 0, tilt: 0 } : sway(g, size, holdPhase)
+    // Sagging: down, more at the far end it leans to, and a tired shake.
+    const lean = g.held ? 0 : sag * ((g.cx - mid) / size) * sagTilt * size
+    const droop = g.held ? 0 : -sag * size * (sagDown + 0.03 * Math.sin(wobble * 5 + g.cx / size))
     motion[i * 4] = g.ox * weight
-    motion[i * 4 + 1] = (g.oy + s.bob) * weight
+    motion[i * 4 + 1] = (g.oy + s.bob + droop - lean) * weight
     motion[i * 4 + 2] = g.oz * weight
-    motion[i * 4 + 3] = (g.a + s.tilt) * weight
+    motion[i * 4 + 3] = (g.a + s.tilt - (g.held ? 0 : sag * sagTilt)) * weight
   }
 }

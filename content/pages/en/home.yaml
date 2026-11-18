@@ -16,6 +16,12 @@ blocks:
         lines:
           - Careful, this headline is heavy — it carries the whole brand.
           - Every project we take has to be different. That's the rule.
+        # Click a letter of the heading in 3D: it falls off, Bohdan fetches it and mutters (E4).
+        grumbles:
+          - Hey! Hands off the brand.
+          - Again?! That's the third one today.
+          - It's not a toy, it's typography.
+          - Glued it back. Don't touch.
       - target: action-0
         actor: kit
         pose: typing
