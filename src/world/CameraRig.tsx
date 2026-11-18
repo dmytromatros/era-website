@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { PORTAL_TIMING } from '@/experience/portal'
 import { live, useExperience } from '@/experience/store'
 import { arcadeWeight, useArcade } from './arcade/arcadeState'
+import { monitorWeight, useMonitor } from './monitor/monitorState'
 import { accentAt, cameraFocus, dollyFov, dollyPosition } from './cinema'
 import { ATTENTION, attention, attentionWeight, cameraStill, glanceZoom, STILL_AFTER } from './crowd/attention'
 import { cutsceneNow } from './cutscene/cutsceneModel'
@@ -99,8 +100,11 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     // cutscene or a portal. Time-based from the gag's start, like the crack (rules 1, 27).
     const { portal, arrivedVia } = useExperience.getState()
     const accent = accentAt(t.railIndex, timing.keyRail)
-    // How far into the arcade's screen (E3; 0 = on the rail): no glance meanwhile, no steps.
-    const arc = arcadeWeight()
+    // How far into a screen — the arcade's (E3) or the monitor's (E5); 0 = on the rail: no glance
+    // meanwhile, no steps. One at a time (a click on either waits for the other to be idle).
+    const arcW = arcadeWeight()
+    const monW = arcW > 0 ? 0 : monitorWeight()
+    const arc = arcW || monW
     const free =
       t.entrance >= 1 && portal.phase === 'idle' && arc === 0 && (cutsceneNow.phase === 'idle' || cutsceneNow.phase === 'done')
     // Standing or scrolling? (From the shown progress, rule 1.) Scrolling again mid-glance eases it out.
@@ -142,11 +146,12 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
       tmpPos.addScaledVector(tmpTarget, -STEP_OUT * (1 - k) * (1 - k))
     }
 
-    // Flying into the arcade's screen (E3, arcade/arcadeState.ts) and back: from wherever the rail
-    // has the camera to straight in front of the screen (it fills the frame). The look turns to
-    // it first, the camera follows. In real time from the click (like the portal, rule 1); the
-    // field of view stays (rule 27): only the distance makes the screen fill the frame.
-    const arcState = arc > 0 ? useArcade.getState() : null
+    // Flying into the arcade's screen (E3, arcade/arcadeState.ts) or the monitor's (E5,
+    // monitor/monitorState.ts) and back: from wherever the rail has the camera to straight in
+    // front of the screen (it fills the frame). The look turns to it first, the camera follows.
+    // In real time from the click (like the portal, rule 1); the field of view stays (rule 27):
+    // only the distance makes the screen fill the frame.
+    const arcState = arcW > 0 ? useArcade.getState() : monW > 0 ? useMonitor.getState() : null
     if (arcState?.eye && arcState.look) {
       tmpTarget.set(...arcState.eye)
       tmpPos.lerp(tmpTarget, arc)
@@ -194,7 +199,7 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     const railFocus = tmpPos.distanceTo(glance.railLook)
     cameraFocus.distance = glance.weight > 0 ? THREE.MathUtils.lerp(railFocus, tmpPos.distanceTo(glance.at), glance.weight) : railFocus
     cameraFocus.accent = Math.max(accent, glance.weight)
-    // Into the arcade: focus on the screen, the office behind blurs for the flight (a whoosh),
+    // Into a screen: focus on it, the office behind blurs for the flight (a whoosh),
     // sharp again once there.
     if (arcState?.look) {
       tmpTarget.set(...arcState.look)

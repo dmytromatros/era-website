@@ -20,6 +20,12 @@ export const ARCADE = {
 
 export type ArcadePhase = 'idle' | 'entering' | 'inside' | 'leaving'
 
+/** How long a flight into a screen and back takes (s): the arcade's, or the monitor's (E5). */
+export interface FlightTimes {
+  enter: number
+  leave: number
+}
+
 /** Where the camera looks at the screen from: straight on, the whole screen in the frame. */
 export function screenView(screen: ArcadeCabinet['screen'], aspect: number): { eye: Vec3; look: Vec3; distance: number } {
   const eye = arcadeEye(screen.center, screen.normal, aspect)
@@ -33,16 +39,16 @@ const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2
  * How far the camera is from the rail into the screen (0 = on the rail, 1 = at the screen), `age`
  * seconds into the phase; leaving starts from `from` (it may turn round mid-flight).
  */
-export function flightWeight(phase: ArcadePhase, age: number, from = 1): number {
+export function flightWeight(phase: ArcadePhase, age: number, from = 1, times: FlightTimes = ARCADE): number {
   switch (phase) {
     case 'idle':
       return 0
     case 'entering':
-      return ease(Math.min(Math.max(age / ARCADE.enter, 0), 1))
+      return ease(Math.min(Math.max(age / times.enter, 0), 1))
     case 'inside':
       return 1
     case 'leaving':
-      return from * (1 - ease(Math.min(Math.max(age / ARCADE.leave, 0), 1)))
+      return from * (1 - ease(Math.min(Math.max(age / times.leave, 0), 1)))
   }
 }
 
@@ -62,12 +68,14 @@ function segmentDistance(x: number, z: number, a: Vec3, b: Vec3): number {
  */
 export function flightClear(
   from: Vec3,
-  cabinet: ArcadeCabinet,
+  /** The thing flown into (the arcade, the monitor, E5): only its floor point counts. */
+  cabinet: Pick<ArcadeCabinet, 'at'>,
   to: Vec3,
   walls: Box[],
   blockers: { x: number; z: number; r: number }[],
+  reach: number = ARCADE.reach,
 ): boolean {
-  if (Math.hypot(to[0] - from[0], to[2] - from[2]) > ARCADE.reach) return false
+  if (Math.hypot(to[0] - from[0], to[2] - from[2]) > reach) return false
   if (walls.some((w) => crosses(from, to, w))) return false
   return blockers.every((b) => {
     if (Math.hypot(b.x - cabinet.at[0], b.z - cabinet.at[2]) < 1.2) return true

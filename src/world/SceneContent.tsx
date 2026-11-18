@@ -21,6 +21,7 @@ import { CoffeeScene } from './coffee/CoffeeScene'
 import { Cutscene } from './cutscene/Cutscene'
 import { LazyCrowd } from './crowd/LazyCrowd'
 import { LazyArcade } from './arcade/LazyArcade'
+import { LazyMonitor } from './monitor/LazyMonitor'
 import { Settle } from './Settle'
 import { HeroTransit, type TransitItem } from './HeroTransit'
 import type { KineticOptions } from './KineticText'
@@ -185,6 +186,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       <LazyCrowd office={world.office} layout={world.layout} floor={world.floor} />
       {/* The arcade machine's screen (E3): click it to fly in. */}
       <LazyArcade office={world.office} layout={world.layout} timing={timing} texts={scene.arcade} accent={style.accent} />
+      {/* The monitor showing the landing (E5): click it to fly in — and you are back at the top of the 2D page. */}
+      <LazyMonitor office={world.office} layout={world.layout} timing={timing} texts={scene.monitor} />
       {/* Floating shapes are off inside the office (perPoint 0); raise it to bring them back. */}
       <Decor rail={world.layout.rail} clearance={world.layout.corridorHalfWidth} perPoint={0} />
       <HeroTransit items={world.transit} k={k} viewport={size} sceneKey={scene.key} />

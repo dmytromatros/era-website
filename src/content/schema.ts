@@ -274,6 +274,16 @@ export const arcadeSchema = z.object({
 
 export type ArcadeTexts = z.infer<typeof arcadeSchema>
 
+/**
+ * The monitor that shows the 2D landing (wow-plan E5): its screen is a picture of the page itself,
+ * so the only text of its own is what it says when the visitor clicks it from too far away.
+ */
+export const monitorSchema = z.object({
+  comeCloser: z.string().min(1).max(24),
+})
+
+export type MonitorTexts = z.infer<typeof monitorSchema>
+
 export const siteSchema = z.object({
   name: z.string().min(1),
   defaultLocale: z.string().min(2),
@@ -286,6 +296,8 @@ export const siteSchema = z.object({
   cutscene: z.record(z.string(), cutsceneSchema).optional(),
   /** Per locale: the arcade machine's texts (E3); absent = the screen stays dark, no flying in. */
   arcade: z.record(z.string(), arcadeSchema).optional(),
+  /** Per locale: the monitor's texts (E5); absent = no monitor in the office. */
+  monitor: z.record(z.string(), monitorSchema).optional(),
 })
 
 export type Site = z.infer<typeof siteSchema>
