@@ -8,6 +8,7 @@ import { useExperience } from '@/experience/store'
 import { localizeHref } from '@/lib/href'
 import { ThemeSwitch } from '@/theme/ThemeSwitch'
 import { StyleSwitch } from '@/world/StyleSwitch'
+import { DaylightSwitch } from '@/world/daylight/DaylightSwitch'
 import { XRaySwitch } from '@/world/XRaySwitch'
 import styles from './Header.module.css'
 
@@ -52,6 +53,7 @@ export function Header({ siteName, locale, nav }: Props) {
       <div className={styles.tools}>
         <ModeSwitch />
         <StyleSwitch />
+        <DaylightSwitch />
         <XRaySwitch />
         <ThemeSwitch />
       </div>

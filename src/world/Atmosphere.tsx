@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { useExperience } from '@/experience/store'
 import { useTheme, useThemeStore } from '@/theme/store'
 import { dayFrame } from './daylight/dayFrame'
+import { useDaylight } from './daylight/daylightChoice'
 import {
   baseLook,
   CLOCK_EVERY_MS,
@@ -90,7 +91,8 @@ export function Atmosphere() {
     }
     // All of it from the handover on (the office is behind the whole film at that frame); 0 on
     // the 2D landing. The dark theme keeps its own light.
-    const on = daylight && themeName === 'light' && useExperience.getState().handedOver
+    // Off (the default): the plain day of the theme; on: the visitor's clock (DaylightSwitch).
+    const on = daylight && useDaylight.getState().live && themeName === 'light' && useExperience.getState().handedOver
     const mix = on ? 1 : 0
     if (mix !== s.mix) changed = true
     if (!changed) return

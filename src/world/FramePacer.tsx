@@ -18,6 +18,7 @@ import { useQuality } from './quality'
 import { useStyle } from './style'
 import { useXRay } from './xrayState'
 import { useArcade } from './arcade/arcadeState'
+import { useDaylight } from './daylight/daylightChoice'
 import { useMonitor } from './monitor/monitorState'
 
 export function FramePacer() {
@@ -59,6 +60,7 @@ export function FramePacer() {
       useQuality.subscribe(wake),
       useXRay.subscribe(wake),
       useArcade.subscribe(wake),
+      useDaylight.subscribe(wake),
       useMonitor.subscribe(wake),
     ]
     const events = ['scroll', 'resize', 'visibilitychange'] as const

@@ -84,8 +84,11 @@ export const OUTDOOR: Record<TimeName, Outdoor> = {
   evening: { sun: '#fffaf2', sunIntensity: 1.05, sunPos: [4, 12, 6], window: '#22305a', hemiGround: '#7a7f96', hemiIntensity: 1.25, lampsOn: 1 },
 }
 
-/** A ceiling lamp that is off: its diffuser, a little greyer than the lit panel (not glowing). */
-export const lampOff = (lamp: string) => mixHex(lamp, '#cfd2d4', 0.45)
+/**
+ * A ceiling lamp that is off: a grey diffuser, clearly greyer than the ceiling around it (Dima
+ * 2026-11-18: a lighter grey still read as a lamp that is on, the shaded ceiling being darker).
+ */
+export const lampOff = (lamp: string) => mixHex(lamp, '#9da2a7', 0.6)
 
 /** The full look of `name`: the theme inside, the time's outdoors on top. */
 export function looksOf(name: TimeName, base: DayLook): DayLook {
