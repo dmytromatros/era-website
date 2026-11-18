@@ -8,7 +8,8 @@
  * - furniture (desk clusters, plants, shelves, sofas) fills free floor beside the path;
  * - a coffee corner or two (E2a): where the office's people meet (world/crowd);
  * - a stand-up meeting corner (E2b): a high table and a whiteboard with a chart;
- * - an arcade machine (E3): in plain view of a stop, its screen facing it.
+ * - an arcade machine (E3): in plain view of a stop, its screen facing it;
+ * - a big monitor on a standing desk (E5) showing the 2D landing: the same kind of spot.
  *
  * Everything is made of primitives (boxes, cylinders, balls) in a few materials, so the renderer
  * can draw all of it with a handful of instanced meshes. Nothing may stand on `clear` floor.
@@ -101,6 +102,19 @@ export interface ArcadeCabinet {
   seen: number
 }
 
+/**
+ * A big monitor on a standing desk (E5): its screen shows the 2D landing (world/monitor); the
+ * camera flies from the rail into it and the visitor is back at the top of the 2D page.
+ */
+export interface MonitorDesk {
+  at: Vec3
+  yaw: number
+  screen: ArcadeCabinet['screen']
+  /** Index of the stop that sees it best, and from how far (m). */
+  station: number
+  seen: number
+}
+
 export interface Office {
   solid: Prim[]
   glass: Box[]
@@ -125,6 +139,8 @@ export interface Office {
   sofas: Sofa[]
   /** The arcade machine (E3), 0–1. */
   arcade: ArcadeCabinet[]
+  /** The monitor showing the landing (E5), 0–1. */
+  monitor: MonitorDesk[]
 }
 
 export const OFFICE = {
@@ -244,6 +260,18 @@ export function arcadeEye(center: Vec3, normal: [number, number], aspect: number
   const t = Math.tan((ENTRANCE_GEOMETRY.fov * Math.PI) / 360)
   const [w, h] = ARCADE_CAB.screen.size
   const d = Math.max(h / 2 / t, w / 2 / (t * aspect)) * ARCADE_CAB.margin
+  return [center[0] + normal[0] * d, center[1], center[2] + normal[1] * d]
+}
+
+/**
+ * Where the camera ends its flight into the monitor (E5): straight in front, so close that the
+ * screen covers the whole frame (a hair more than edge to edge, MONITOR_DESK.margin) — the frame
+ * then shows nothing but the landing drawn on it, the moment the page swaps to the real one.
+ */
+export function monitorEye(center: Vec3, normal: [number, number], aspect: number): Vec3 {
+  const t = Math.tan((ENTRANCE_GEOMETRY.fov * Math.PI) / 360)
+  const [w, h] = MONITOR_DESK.screen.size
+  const d = Math.min(h / 2 / t, w / 2 / (t * aspect)) * MONITOR_DESK.margin
   return [center[0] + normal[0] * d, center[1], center[2] + normal[1] * d]
 }
 
@@ -449,6 +477,43 @@ export const ARCADE_CAB = {
   margin: 1.24,
 }
 
+/**
+ * The monitor (E5), front = +z: a standing desk with a big display on a stand, a keyboard, a mug
+ * and a sticky note on the bezel. The screen itself is a canvas texture 2 cm in front of the
+ * bezel (MONITOR_DESK.screen), drawn by world/monitor. Footprint ≈ 1.5 × 0.7.
+ */
+function monitorDesk(): Prim[] {
+  return [
+    box([0, 1.02, 0], [1.5, 0.05, 0.7], 'wood'),
+    box([-0.68, 0.5, 0], [0.06, 1.0, 0.6], 'metal'),
+    box([0.68, 0.5, 0], [0.06, 1.0, 0.6], 'metal'),
+    box([0, 0.3, -0.25], [1.3, 0.05, 0.05], 'metal'),
+    box([0, 1.055, -0.14], [0.36, 0.02, 0.22], 'metal'),
+    box([0, 1.2, -0.19], [0.07, 0.3, 0.04], 'metal'),
+    box([0, 1.55, -0.12], [1.26, 0.81, 0.05], 'frame'),
+    box([0, 1.55, -0.165], [0.6, 0.4, 0.04], 'frame'),
+    box([0, 1.055, 0.16], [0.52, 0.02, 0.17], 'frame'),
+    box([0.4, 1.06, 0.18], [0.06, 0.025, 0.1], 'frame'),
+    cyl([-0.52, 1.1, 0.12], 0.09, 0.11, 'wall'),
+    box([0.5, 1.87, -0.092], [0.11, 0.11, 0.006], 'bookC', 0.12),
+  ]
+}
+
+/** Where the monitor's parts are in its own space (front +z). */
+export const MONITOR_DESK = {
+  /** The screen: 2 cm in front of the bezel's face (z −0.095), 16 : 10. */
+  screen: { center: [0, 1.55, -0.075] as Vec3, size: [1.2, 0.75] as [number, number] },
+  /** Turned this much from facing the stop square on (rad): seen as a thing, the screen still reads. */
+  turn: 0.35,
+  footprint: { at: [0, 0, 0] as Vec3, r: 0.9 },
+  view: [3.5, 12] as const,
+  cone: 0.7,
+  /** The arcade, the coffee corners and the meeting stay this far away (m). */
+  apart: 6.5,
+  /** Flying in, the screen covers the frame by this much (< 1: a hair beyond edge to edge). */
+  margin: 0.98,
+}
+
 function lounge(): Prim[] {
   return [
     box([0, 0.22, -0.3], [1.9, 0.44, 0.84], 'fabricB'),
@@ -578,41 +643,63 @@ export function buildOffice(layout: WorldLayout, seed = 11, aspect = 16 / 9): Of
   // room beside the exhibits: then within a wide screen's frame — seen when the camera turns,
   // walking past.
   const tan = Math.tan((ENTRANCE_GEOMETRY.fov * Math.PI) / 360)
-  let arcBest: { at: Vec3; yaw: number; station: number; seen: number } | null = null
-  for (const a of aspect < 16 / 9 ? [aspect, 16 / 9] : [aspect]) {
-    arcBest ??= arcadeSpot(Math.atan(tan * a) * ARCADE_CAB.cone)
-  }
-  function arcadeSpot(halfWidth: number) {
-    const candidates: { at: Vec3; station: number; d: number }[] = []
-    const step = halfWidth / Math.max(2, Math.round(halfWidth / 0.08))
-    layout.stations.forEach((st, station) => {
-      if (st.viewpoint[1] > OFFICE.sill + 1.5) return
-      const look = Math.atan2(st.focus[0] - st.viewpoint[0], st.focus[2] - st.viewpoint[2])
-      for (let a = -halfWidth; a <= halfWidth + 1e-9; a += step) {
-        for (let d = ARCADE_CAB.view[0]; d <= ARCADE_CAB.view[1]; d += 0.5) {
-          candidates.push({ at: [st.viewpoint[0] + Math.sin(look + a) * d, 0, st.viewpoint[2] + Math.cos(look + a) * d], station, d })
+  /**
+   * The nearest spot a ground-floor stop sees for a thing with a screen (E3, E5): its footprint
+   * fits, `ok` agrees, no exhibit nor glass on the line of sight nor on the camera's way to `eye`.
+   */
+  function screenSpot(spec: {
+    turn: number
+    footprint: { at: Vec3; r: number }
+    view: readonly [number, number]
+    cone: number
+    screen: Vec3
+    eye: (center: Vec3, normal: [number, number]) => Vec3
+    ok: (at: Vec3, yaw: number) => boolean
+  }) {
+    let best: { at: Vec3; yaw: number; station: number; seen: number } | null = null
+    for (const a of aspect < 16 / 9 ? [aspect, 16 / 9] : [aspect]) best ??= spotIn(Math.atan(tan * a) * spec.cone)
+    return best
+    function spotIn(halfWidth: number) {
+      const candidates: { at: Vec3; station: number; d: number }[] = []
+      const step = halfWidth / Math.max(2, Math.round(halfWidth / 0.08))
+      layout.stations.forEach((st, station) => {
+        if (st.viewpoint[1] > OFFICE.sill + 1.5) return
+        const look = Math.atan2(st.focus[0] - st.viewpoint[0], st.focus[2] - st.viewpoint[2])
+        for (let a = -halfWidth; a <= halfWidth + 1e-9; a += step) {
+          for (let d = spec.view[0]; d <= spec.view[1]; d += 0.5) {
+            candidates.push({ at: [st.viewpoint[0] + Math.sin(look + a) * d, 0, st.viewpoint[2] + Math.cos(look + a) * d], station, d })
+          }
         }
+      })
+      candidates.sort((p, q) => p.d - q.d)
+      for (const { at, station, d } of candidates) {
+        const vp = layout.stations[station]!.viewpoint
+        const yaw = Math.atan2(vp[0] - at[0], vp[2] - at[2]) + spec.turn
+        const foot = placePoint(spec.footprint.at, at, yaw)
+        if (!fits(foot[0], foot[2], spec.footprint.r)) continue
+        if (!spec.ok(at, yaw)) continue
+        if (exhibitsInView.some((b) => lineHits(vp, at, b)) || walls.some((w) => crosses(vp, at, w))) continue
+        // The camera's way in, too: from the stop to straight in front of the screen.
+        const eye = spec.eye(placePoint(spec.screen, at, yaw), [Math.sin(yaw), Math.cos(yaw)])
+        if (walls.some((w) => crosses(vp, eye, w))) continue
+        if (exhibitsInView.some((b) => segmentDistance(b.x, b.z, vp, eye) <= b.r * 0.8)) continue
+        return { at, yaw, station, seen: d }
       }
-    })
-    candidates.sort((p, q) => p.d - q.d)
-    for (const { at, station, d } of candidates) {
-      const vp = layout.stations[station]!.viewpoint
-      const yaw = Math.atan2(vp[0] - at[0], vp[2] - at[2]) + ARCADE_CAB.turn
-      const foot = placePoint(ARCADE_CAB.footprint.at, at, yaw)
-      if (!fits(foot[0], foot[2], ARCADE_CAB.footprint.r)) continue
-      const player = placePoint(ARCADE_CAB.player.at, at, yaw)
-      if (!fits(player[0], player[2], 0.35)) continue
-      const aside = placePoint(ARCADE_CAB.aside.at, at, yaw)
-      if (!fits(aside[0], aside[2], 0.3)) continue
-      if (exhibitsInView.some((b) => lineHits(vp, at, b)) || walls.some((w) => crosses(vp, at, w))) continue
-      // The camera's way in, too: from the stop to straight in front of the screen.
-      const eye = arcadeEye(placePoint(ARCADE_CAB.screen.center, at, yaw), [Math.sin(yaw), Math.cos(yaw)], aspect)
-      if (walls.some((w) => crosses(vp, eye, w))) continue
-      if (exhibitsInView.some((b) => segmentDistance(b.x, b.z, vp, eye) <= b.r * 0.8)) continue
-      return { at, yaw, station, seen: d }
+      return null
     }
-    return null
   }
+  const arcBest = screenSpot({
+    ...ARCADE_CAB,
+    screen: ARCADE_CAB.screen.center,
+    eye: (c, n) => arcadeEye(c, n, aspect),
+    ok: (at, yaw) => {
+      const player = placePoint(ARCADE_CAB.player.at, at, yaw)
+      if (!fits(player[0], player[2], 0.35)) return false
+      const aside = placePoint(ARCADE_CAB.aside.at, at, yaw)
+      return fits(aside[0], aside[2], 0.3)
+    },
+  })
+
   if (arcBest) {
     const { at, yaw, station, seen } = arcBest
     const local = (v: Vec3) => placePoint(v, at, yaw)
@@ -639,8 +726,32 @@ export function buildOffice(layout: WorldLayout, seed = 11, aspect = 16 / 9): Of
     const vp = layout.stations[station]!.viewpoint
     sight.push([vp, screen], [vp, arcadeEye(screen, [Math.sin(yaw), Math.cos(yaw)], aspect)])
   }
+
+  // ---- the monitor showing the landing (E5), right after the arcade and the same way: in plain
+  // view of a stop, the camera's way to it kept free; away from the arcade ----
+  const monitor: MonitorDesk[] = []
+  const monBest = screenSpot({
+    ...MONITOR_DESK,
+    screen: MONITOR_DESK.screen.center,
+    eye: (c, n) => monitorEye(c, n, aspect),
+    ok: (at) => arcade.every((a) => Math.hypot(a.at[0] - at[0], a.at[2] - at[2]) >= MONITOR_DESK.apart),
+  })
+  if (monBest) {
+    const { at, yaw, station, seen } = monBest
+    const foot = placePoint(MONITOR_DESK.footprint.at, at, yaw)
+    placed.push({ x: foot[0], z: foot[2], r: MONITOR_DESK.footprint.r })
+    solid.push(...place(monitorDesk(), at, yaw))
+    const normal: [number, number] = [Math.sin(yaw), Math.cos(yaw)]
+    const screen = placePoint(MONITOR_DESK.screen.center, at, yaw)
+    monitor.push({ at, yaw, screen: { center: screen, size: MONITOR_DESK.screen.size, normal }, station, seen })
+    const vp = layout.stations[station]!.viewpoint
+    sight.push([vp, screen], [vp, monitorEye(screen, normal, aspect)])
+  }
+
   // The other gags keep their distance (they would pile up in one place).
-  const nearArcade = (x: number, z: number) => arcade.some((a) => Math.hypot(a.at[0] - x, a.at[2] - z) < ARCADE_CAB.apart)
+  const nearArcade = (x: number, z: number) =>
+    arcade.some((a) => Math.hypot(a.at[0] - x, a.at[2] - z) < ARCADE_CAB.apart) ||
+    monitor.some((a) => Math.hypot(a.at[0] - x, a.at[2] - z) < MONITOR_DESK.apart)
 
   clear.forEach((c, ci) => {
     if (c.frame.level > 0 || ci === 0) return // nothing on mezzanines (handled) or in the entrance
@@ -813,5 +924,6 @@ export function buildOffice(layout: WorldLayout, seed = 11, aspect = 16 / 9): Of
     meeting,
     sofas,
     arcade,
+    monitor,
   }
 }

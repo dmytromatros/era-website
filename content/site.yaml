@@ -52,3 +52,9 @@ arcade:
       - { name: DIANA, score: 4200, note: "SPILLED THE COFFEE" }
       - { name: YOU, score: 0, note: "JUST GOT HERE" }
     back: "Back to the office"
+# The monitor in the office that shows this very landing (wow-plan E5): click its screen in 3D,
+# the camera flies into it and you are back at the top of the 2D page. Its picture is the page
+# itself; the only text is what it says when clicked from too far away.
+monitor:
+  en:
+    comeCloser: "Come closer"

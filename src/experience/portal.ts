@@ -13,6 +13,7 @@
  */
 import { isInternal } from '@/lib/href'
 import { leaveArcade } from '@/world/arcade/arcadeState'
+import { resetMonitor } from '@/world/monitor/monitorState'
 import { live, useExperience } from './store'
 
 export const PORTAL_TIMING = {
@@ -44,6 +45,8 @@ export function portalTo(
   if (sceneKeyOf(href) === s.scene?.key) return
   // Inside the arcade (E3; the menu still works): out of the machine first, its history entry off.
   leaveArcade()
+  // Mid-flight into the monitor (E5): that flight is off, the scroll free again.
+  resetMonitor()
   s.setPortal('diving', {
     target: opts.target ?? null,
     origin: opts.origin ?? { x: live.pointerUv.x, y: 1 - live.pointerUv.y },

@@ -15,6 +15,7 @@ import { settleAnchors } from '../settleModel'
 import { totalUnits } from '../timeline'
 import { useQualitySettings } from '../quality'
 import { ARCADE, flightClear, screenView } from './arcadeModel'
+import { useMonitor } from '../monitor/monitorState'
 import { arcadeArrived, arcadeLeft, arcadeLink, enterArcade, leaveArcade, resetArcade, useArcade } from './arcadeState'
 import type { ArcadeGame } from './games/types'
 import { COLORS, drawAttract, drawBanner, drawDemo, makeCrt, SCREEN } from './screenDraw'
@@ -153,7 +154,8 @@ export function Arcade({
   function tryEnter(camera: THREE.Camera) {
     const x = useExperience.getState()
     const cutscene = cutsceneNow.phase !== 'idle' && cutsceneNow.phase !== 'done'
-    if (x.portal.phase !== 'idle' || x.arrival || cutscene || coffeeTalk.on) {
+    // Not while the camera flies into the monitor (E5): one screen at a time.
+    if (x.portal.phase !== 'idle' || x.arrival || cutscene || coffeeTalk.on || useMonitor.getState().phase !== 'idle') {
       s.current.why = 'busy'
       return
     }

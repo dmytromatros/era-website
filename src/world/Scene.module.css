@@ -13,8 +13,10 @@
   transition: opacity 0.3s ease;
 }
 
-/* Inside the arcade (E3): the characters' bubbles around the frame would sit over the screen. */
-:global(html[data-arcade]) .overlay {
+/* Inside the arcade (E3), or flying into the monitor (E5): the characters' bubbles around the
+   frame would sit over the screen. */
+:global(html[data-arcade]) .overlay,
+:global(html[data-monitor]) .overlay {
   opacity: 0;
 }
 

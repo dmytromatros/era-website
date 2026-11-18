@@ -50,6 +50,7 @@ export default async function Page({ params }: PageProps<'/[locale]/[[...slug]]'
         welcome: welcome ? { ...welcome, def: readActor(welcome.actor) } : undefined,
         cutscene: site.cutscene?.[locale],
         arcade: site.arcade?.[locale],
+        monitor: site.monitor?.[locale],
       }}
     />
   )
