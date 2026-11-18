@@ -20,6 +20,7 @@ import { Shards } from './firstPerson/Shards'
 import { CoffeeScene } from './coffee/CoffeeScene'
 import { Cutscene } from './cutscene/Cutscene'
 import { LazyCrowd } from './crowd/LazyCrowd'
+import { LazyArcade } from './arcade/LazyArcade'
 import { Settle } from './Settle'
 import { HeroTransit, type TransitItem } from './HeroTransit'
 import type { KineticOptions } from './KineticText'
@@ -98,7 +99,7 @@ export function SceneContent({ scene }: { scene: SceneData }) {
         kinetic: spec.id === KINETIC_ELEMENT ? kinetic : undefined,
       }))
     })
-    const office = buildOffice(layout, style.seed)
+    const office = buildOffice(layout, style.seed, size.width / size.height)
 
     // ---- props you can push (C2): beside the exhibits, plus the static world they hit ----
     const exhibits: StopExhibit[] = models.map((m, i) => {
@@ -180,6 +181,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       <Office data={world.office} accent={style.accent} />
       {/* The office's own people (E2a): typing, chatting by the coffee, walking about. */}
       <LazyCrowd office={world.office} layout={world.layout} floor={world.floor} />
+      {/* The arcade machine's screen (E3): click it to fly in. */}
+      <LazyArcade office={world.office} layout={world.layout} timing={timing} texts={scene.arcade} accent={style.accent} />
       {/* Floating shapes are off inside the office (perPoint 0); raise it to bring them back. */}
       <Decor rail={world.layout.rail} clearance={world.layout.corridorHalfWidth} perPoint={0} />
       <HeroTransit items={world.transit} k={k} viewport={size} sceneKey={scene.key} />

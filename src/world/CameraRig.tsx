@@ -5,6 +5,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { PORTAL_TIMING } from '@/experience/portal'
 import { live, useExperience } from '@/experience/store'
+import { arcadeWeight, useArcade } from './arcade/arcadeState'
 import { accentAt, cameraFocus, dollyFov, dollyPosition } from './cinema'
 import { ATTENTION, attention, attentionWeight, cameraStill, glanceZoom, STILL_AFTER } from './crowd/attention'
 import { cutsceneNow } from './cutscene/cutsceneModel'
@@ -98,7 +99,10 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     // cutscene or a portal. Time-based from the gag's start, like the crack (rules 1, 27).
     const { portal, arrivedVia } = useExperience.getState()
     const accent = accentAt(t.railIndex, timing.keyRail)
-    const free = t.entrance >= 1 && portal.phase === 'idle' && (cutsceneNow.phase === 'idle' || cutsceneNow.phase === 'done')
+    // How far into the arcade's screen (E3; 0 = on the rail): no glance meanwhile, no steps.
+    const arc = arcadeWeight()
+    const free =
+      t.entrance >= 1 && portal.phase === 'idle' && arc === 0 && (cutsceneNow.phase === 'idle' || cutsceneNow.phase === 'done')
     // Standing or scrolling? (From the shown progress, rule 1.) Scrolling again mid-glance eases it out.
     if (Math.abs(live.progress - cameraStill.last) > 1e-5 || !Number.isFinite(cameraStill.last)) cameraStill.since = clock.elapsedTime
     cameraStill.last = live.progress
@@ -138,13 +142,25 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
       tmpPos.addScaledVector(tmpTarget, -STEP_OUT * (1 - k) * (1 - k))
     }
 
+    // Flying into the arcade's screen (E3, arcade/arcadeState.ts) and back: from wherever the rail
+    // has the camera to straight in front of the screen (it fills the frame). The look turns to
+    // it first, the camera follows. In real time from the click (like the portal, rule 1); the
+    // field of view stays (rule 27): only the distance makes the screen fill the frame.
+    const arcState = arc > 0 ? useArcade.getState() : null
+    if (arcState?.eye && arcState.look) {
+      tmpTarget.set(...arcState.eye)
+      tmpPos.lerp(tmpTarget, arc)
+      tmpTarget.set(...arcState.look)
+      tmpLook.lerp(tmpTarget, Math.min(1, arc * 1.35))
+    }
+
     camera.position.copy(tmpPos)
     c.lookAt.copy(tmpLook)
     camera.lookAt(c.lookAt)
 
     // Walking (D2, walkModel.ts): steps from the distance walked along the rail, a run when fast,
     // a step onto each stair, a lean into turns. None during the entrance or a portal (faded).
-    const allowed = THREE.MathUtils.smoothstep(t.entrance, 0.9, 1) * (portal.phase === 'idle' ? 1 : 0)
+    const allowed = THREE.MathUtils.smoothstep(t.entrance, 0.9, 1) * (portal.phase === 'idle' && arc === 0 ? 1 : 0)
     walk.weight += (allowed - walk.weight) * (1 - Math.exp(-Math.min(delta, 0.1) * 4))
     const w = stepWalk(walk.state, {
       position: [walk.rail.x, walk.rail.y, walk.rail.z],
@@ -178,6 +194,13 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     const railFocus = tmpPos.distanceTo(glance.railLook)
     cameraFocus.distance = glance.weight > 0 ? THREE.MathUtils.lerp(railFocus, tmpPos.distanceTo(glance.at), glance.weight) : railFocus
     cameraFocus.accent = Math.max(accent, glance.weight)
+    // Into the arcade: focus on the screen, the office behind blurs for the flight (a whoosh),
+    // sharp again once there.
+    if (arcState?.look) {
+      tmpTarget.set(...arcState.look)
+      cameraFocus.distance = THREE.MathUtils.lerp(cameraFocus.distance, tmpPos.distanceTo(tmpTarget), arc)
+      cameraFocus.accent = Math.max(cameraFocus.accent * (1 - arc), Math.sin(Math.PI * arc) * 0.85)
+    }
   })
 
   return null

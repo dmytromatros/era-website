@@ -36,7 +36,7 @@ describe('dolly zoom (B3)', () => {
   ] as const) {
     it(`stays clear of furniture and columns on the way in (${name} screen)`, () => {
       const layout = layoutRoute(plan, sizes, aspect)
-      const office = buildOffice(layout)
+      const office = buildOffice(layout, undefined, aspect)
       const target = layout.stations[0]!.focus
       const [a, b] = [layout.rail[0]!, layout.rail[1]!]
       for (let i = 0; i <= 50; i++) {

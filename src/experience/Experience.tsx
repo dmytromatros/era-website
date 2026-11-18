@@ -62,6 +62,8 @@ export function Experience() {
     const onPop = () => {
       const s = useExperience.getState()
       if (s.mode !== '3d') return
+      // Back / Forward within the same page (the arcade's history entry, E3): nothing to cover.
+      if (sceneKeyOf(window.location.pathname) === s.scene?.key) return
       const y = live.positions[sceneKeyOf(window.location.pathname)]
       if (y === undefined || y < 4) return
       document.documentElement.setAttribute('data-arrival', '')

@@ -4,13 +4,20 @@
  * cannot scroll — wheel, trackpad (its inertia too), touch, keys — but the scene itself may still
  * move the page (window.scrollTo works). Clicks keep working: the coffee's buttons, the header.
  *
- * A safety net: whatever happens, the lock lets go after `SAFETY_MS`; `unlockScroll` on leaving
- * the page (the cutscene component's cleanup).
+ * Two owners may hold it (E3): the entrance `cutscene` and the `arcade` (the visitor is inside the
+ * machine). Each lets go of its own hold only, so the cutscene letting go every frame does not
+ * free the arcade's. The cinema bars (`html[data-cutscene]`) are the cutscene's alone; the page
+ * stops scrolling under `html[data-scroll-lock]`.
+ *
+ * A safety net for the cutscene: its hold lets go after `SAFETY_MS` whatever happens (the arcade
+ * needs none: Esc, its button and Back always fly out); `unlockScroll` on leaving the page.
  */
 const KEYS = new Set([' ', 'Spacebar', 'PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End'])
 export const SAFETY_MS = 60_000
 
-let locked = false
+export type LockOwner = 'cutscene' | 'arcade'
+
+const holds = new Set<LockOwner>()
 let safety = 0
 
 const stop = (e: Event) => {
@@ -23,24 +30,34 @@ const keys = (e: KeyboardEvent) => {
   if (KEYS.has(e.key)) e.preventDefault()
 }
 
-export const scrollLocked = () => locked
+export const scrollLocked = () => holds.size > 0
 
-export function lockScroll() {
-  if (locked || typeof document === 'undefined') return
-  locked = true
-  document.documentElement.setAttribute('data-cutscene', '')
+export function lockScroll(owner: LockOwner = 'cutscene') {
+  if (holds.has(owner) || typeof document === 'undefined') return
+  const first = holds.size === 0
+  holds.add(owner)
+  const html = document.documentElement
+  if (owner === 'cutscene') {
+    html.setAttribute('data-cutscene', '')
+    safety = window.setTimeout(() => unlockScroll('cutscene'), SAFETY_MS)
+  }
+  if (!first) return
+  html.setAttribute('data-scroll-lock', '')
   window.addEventListener('wheel', stop, { passive: false })
   window.addEventListener('touchmove', stop, { passive: false })
   window.addEventListener('keydown', keys)
-  safety = window.setTimeout(unlockScroll, SAFETY_MS)
 }
 
-export function unlockScroll() {
-  if (!locked) return
-  locked = false
-  document.documentElement.removeAttribute('data-cutscene')
+export function unlockScroll(owner: LockOwner = 'cutscene') {
+  if (!holds.delete(owner)) return
+  const html = document.documentElement
+  if (owner === 'cutscene') {
+    html.removeAttribute('data-cutscene')
+    window.clearTimeout(safety)
+  }
+  if (holds.size) return
+  html.removeAttribute('data-scroll-lock')
   window.removeEventListener('wheel', stop)
   window.removeEventListener('touchmove', stop)
   window.removeEventListener('keydown', keys)
-  window.clearTimeout(safety)
 }

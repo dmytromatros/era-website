@@ -17,6 +17,7 @@ import { noteWaveInput, waves, wavesBusy } from './membraneWaves'
 import { useQuality } from './quality'
 import { useStyle } from './style'
 import { useXRay } from './xrayState'
+import { useArcade } from './arcade/arcadeState'
 
 export function FramePacer() {
   const get = useThree((s) => s.get)
@@ -56,6 +57,7 @@ export function FramePacer() {
       useStyle.subscribe(wake),
       useQuality.subscribe(wake),
       useXRay.subscribe(wake),
+      useArcade.subscribe(wake),
     ]
     const events = ['scroll', 'resize', 'visibilitychange'] as const
     for (const e of events) window.addEventListener(e, wake, { passive: true })

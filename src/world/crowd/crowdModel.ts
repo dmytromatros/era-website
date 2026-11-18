@@ -29,6 +29,11 @@ import { alongPath, areaOf, findPath, pathLength, walkable, type NavGrid } from 
 export const MEET = { tap: 0.8, dropEach: 0.3, fall: 0.7, dismay: [2.0, 3.6] as const, back: 5.6, total: 6 } as const
 /** The sleeper's gag (s): snores harder, jerks up to sitting, looks around, flops back. */
 export const JOLT = { snore: 0.9, up: 0.25, look: 1.4, down: 0.6, total: 3.2 } as const
+/**
+ * The arcade player's gag (E3, s): loses — a frozen moment, arms thrown up ("noooo"), two bangs of
+ * the fists on the control panel, back to playing. "Game over" is on the screen from `over`.
+ */
+export const LOSE = { shock: 0.35, up: 1.3, slam: 2.1, total: 2.6, over: 0.15 } as const
 
 export const CROWD = {
   /** Someone sets off every this many seconds (random in the range). */
@@ -52,6 +57,10 @@ export const CROWD = {
   meetCooldown: 12,
   /** The sleeper: the jolt awake (JOLT timings) again only after `joltCooldown` (s). */
   joltCooldown: 14,
+  /** The arcade player loses (LOSE timings) again only after `loseCooldown` (s). */
+  loseCooldown: 11,
+  /** …and not this soon after the guest gave the machine back (s). */
+  backToPlay: 5,
   /** The camera is called to look at most every this many seconds; a bang calls it this often. */
   attentionGap: 7,
   bonkAttention: 0.6,
@@ -67,8 +76,9 @@ export const CROWD = {
 /**
  * Desk: typing. Coffee: chatting at a corner. Floor: chatting on the route's floor. Pace: on the
  * phone, up and down. Present / meet: a stand-up meeting at a whiteboard (E2b). Sleep: on a sofa.
+ * Arcade: playing the arcade machine (E3).
  */
-export type SpotKind = 'desk' | 'coffee' | 'floor' | 'pace' | 'present' | 'meet' | 'sleep'
+export type SpotKind = 'desk' | 'coffee' | 'floor' | 'pace' | 'present' | 'meet' | 'sleep' | 'arcade'
 
 export interface Spot {
   kind: SpotKind
@@ -89,6 +99,8 @@ export interface Spot {
   meeting?: number
   /** Sleep: a sofa the crowd draws itself (on the route's floor, floorModel.ts). */
   couch?: boolean
+  /** Arcade: where the player steps aside to while the guest has the machine, facing. */
+  aside?: { at: Vec3; yaw: number }
 }
 
 export interface Look {
@@ -98,7 +110,7 @@ export interface Look {
   hair: string
 }
 
-export type Task = 'type' | 'chat' | 'pace' | 'present' | 'meet' | 'sleep' | 'standUp' | 'walk' | 'sitDown'
+export type Task = 'type' | 'chat' | 'pace' | 'present' | 'meet' | 'sleep' | 'play' | 'standUp' | 'walk' | 'sitDown'
 
 export interface Person {
   look: Look
@@ -112,7 +124,10 @@ export interface Person {
   to: number
   path: Vec3[]
   length: number
-  /** Desk: when the last / current head-bang started; sofa: the last / current jolt awake. */
+  /**
+   * Desk: when the last / current head-bang started; sofa: the last / current jolt awake; arcade:
+   * the last / current loss.
+   */
   bonkAt: number
   /** A click on them (E2a): when the reaction started, which one, and recent clicks (scene time). */
   reactAt: number
@@ -187,6 +202,9 @@ export interface Crowd {
   /** E2d: the last time someone noticed the guest. */
   lastNotice: number
   lastAttention: number
+  /** E3: the guest is inside the arcade machine (its player stands aside and watches), since when. */
+  guestPlays: boolean
+  guestSince: number
   rand: () => number
 }
 
@@ -203,6 +221,7 @@ const TASK_OF: Record<SpotKind, Task> = {
   present: 'present',
   meet: 'meet',
   sleep: 'sleep',
+  arcade: 'play',
 }
 
 const pick = <T>(rand: () => number, list: readonly T[]): T => list[Math.floor(rand() * list.length)]!
@@ -210,7 +229,7 @@ const between = (rand: () => number, [a, b]: readonly [number, number]) => a + r
 
 /** Every spot of an office: each desk chair, and both places at each coffee corner. */
 export function crowdSpots(
-  office: Pick<Office, 'chairs' | 'coffee' | 'frosted'> & Partial<Pick<Office, 'meeting' | 'sofas' | 'footprints'>>,
+  office: Pick<Office, 'chairs' | 'coffee' | 'frosted'> & Partial<Pick<Office, 'meeting' | 'sofas' | 'footprints' | 'arcade'>>,
   layout: Pick<WorldLayout, 'rail' | 'stations'>,
   grid: NavGrid,
   floor: FloorGroup[] = [],
@@ -263,6 +282,19 @@ export function crowdSpots(
     // Not behind other furniture (the sofa's own footprint is next to the seat: not counted).
     const seen = seenFrom(s.seat, stations, office.frosted, office.footprints)
     spots.push({ kind: 'sleep', at: s.seat, yaw: s.yaw, exit: null, facesRoute: true, corner: -1, seen })
+  }
+  // The arcade machine (E3): someone plays it (they stay).
+  for (const a of office.arcade ?? []) {
+    spots.push({
+      kind: 'arcade',
+      at: a.player.at,
+      yaw: a.player.yaw,
+      exit: null,
+      facesRoute: true,
+      corner: -1,
+      seen: a.seen,
+      aside: { at: a.player.aside, yaw: a.player.asideYaw },
+    })
   }
   // On the route's floor (floorModel.ts): they stay where they are (no exit).
   for (const g of floor) {
@@ -319,6 +351,8 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
     lastGag: -Infinity,
     lastAttention: -Infinity,
     lastNotice: -Infinity,
+    guestPlays: false,
+    guestSince: -Infinity,
     rand,
   }
   if (count <= 0) return { spots, people, nextMove: Infinity, ...quiet }
@@ -343,6 +377,10 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
   })
   const sofas = spots.map((s, i) => [s, i] as const).filter(([s]) => s.kind === 'sleep' && Number.isFinite(s.seen))
   if (sofas.length && people.length < count) seat([...sofas].sort((a, b) => a[0].seen - b[0].seen)[0]![1])
+  // A player at the arcade machine (E3).
+  spots.forEach((s, i) => {
+    if (s.kind === 'arcade' && Number.isFinite(s.seen) && people.length < count) seat(i)
+  })
   const desks = spots.map((s, i) => [s, i] as const).filter(([s]) => s.kind === 'desk' && Number.isFinite(s.seen))
   const weigh = (list: (readonly [Spot, number])[]) => {
     let total = 0
@@ -429,6 +467,17 @@ function startGag(c: Crowd, now: number, view: View): Attention | null {
     c.meetAt[k] = start
     c.lastGag = now
     return call({ at: c.boards[k]!, start, dur: MEET.dismay[1] })
+  }
+  // The arcade player loses (not while the guest has the machine, nor right after: the shrug).
+  for (const p of c.people) {
+    if (p.task !== 'play' || c.guestPlays || now - c.guestSince < CROWD.backToPlay) continue
+    if (now - p.bonkAt < LOSE.total + CROWD.loseCooldown) continue
+    const at = c.spots[p.spot]!.at
+    if (inView(view, at, CROWD.gagView.burst) === Infinity) continue
+    const start = now + CROWD.lead
+    p.bonkAt = start
+    c.lastGag = now
+    return call({ at: [at[0], at[1] + 1.3, at[2]], start, dur: LOSE.slam }, p)
   }
   // The sleeper jerks awake.
   for (const p of c.people) {
@@ -591,6 +640,22 @@ export function stepCrowd(c: Crowd, now: number, grid: NavGrid, view?: View): At
     return attention
   }
   return attention
+}
+
+/**
+ * The guest flies into the arcade machine (E3) or back out: its player jumps back, surprised, and
+ * watches while the guest is in it; when the guest is gone, shrugs and plays on.
+ */
+export function guestAtArcade(c: Crowd, inside: boolean, now: number) {
+  if (inside === c.guestPlays) return
+  c.guestPlays = inside
+  c.guestSince = now
+  for (const p of c.people) {
+    if (p.task !== 'play') continue
+    p.react = inside ? 'surprised' : 'shrug'
+    p.reactAt = now
+    p.bonkAt = -Infinity
+  }
 }
 
 /** Seconds into the meeting's chart gag at corner `k`, or null. */

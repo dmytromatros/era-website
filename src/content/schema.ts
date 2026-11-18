@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ACCESSORIES, ACTIVITIES, REACTIONS } from '@/actors/catalog'
 import { WIDGETS } from '@/blocks/widgets/catalog'
+import { PIXEL_CHARSET, PIXEL_TEXT } from './pixelCharset'
 
 /* ------------------------------------------------------------------ */
 /* Shared bits                                                         */
@@ -225,6 +226,49 @@ export const cutsceneSchema = z.object({
 
 export type CutsceneTexts = z.infer<typeof cutsceneSchema>
 
+/** A line on the arcade's screen (E3): only what the pixel font draws, and it must fit. */
+const pixelLine = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .regex(PIXEL_TEXT, `arcade screen texts: only ${PIXEL_CHARSET.trim()} and spaces (the pixel font)`)
+
+/**
+ * The arcade machine (wow-plan E3): what its screen says — the attract screen while nobody plays,
+ * and the game slot (for now "coming soon") once the visitor flies into it — and the button that
+ * brings them back. Screen texts are pixel-font lines (upper case); a line holds at most 30.
+ */
+export const arcadeSchema = z.object({
+  title: pixelLine(7),
+  subtitle: pixelLine(15),
+  insertCoin: pixelLine(15),
+  hiScore: pixelLine(10),
+  gameOver: pixelLine(10),
+  comeCloser: pixelLine(15),
+  game: z.object({
+    coinHint: pixelLine(30),
+    coinHintTouch: pixelLine(30),
+    credit: pixelLine(12),
+    loading: pixelLine(12),
+    stuck: pixelLine(30),
+    again: pixelLine(30),
+    soon: pixelLine(15),
+    soonNote: pixelLine(30),
+    scoresTitle: pixelLine(15),
+    exitHint: pixelLine(30),
+    exitHintTouch: pixelLine(30),
+  }),
+  scores: z
+    .array(z.object({ name: pixelLine(8), score: z.number().int().min(0).max(999999), note: pixelLine(30) }))
+    .min(1)
+    .max(4),
+  /** The button (HTML, any text) that flies the visitor back out. */
+  back: z.string().min(1).max(30),
+})
+
+export type ArcadeTexts = z.infer<typeof arcadeSchema>
+
 export const siteSchema = z.object({
   name: z.string().min(1),
   defaultLocale: z.string().min(2),
@@ -235,6 +279,8 @@ export const siteSchema = z.object({
   welcome: z.record(z.string(), welcomeSchema).optional(),
   /** Per locale: the hint shown when the entrance cutscene gives the scroll back. */
   cutscene: z.record(z.string(), cutsceneSchema).optional(),
+  /** Per locale: the arcade machine's texts (E3); absent = the screen stays dark, no flying in. */
+  arcade: z.record(z.string(), arcadeSchema).optional(),
 })
 
 export type Site = z.infer<typeof siteSchema>

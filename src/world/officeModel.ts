@@ -7,13 +7,14 @@
  * - stairs lead to a mezzanine on pillars with a glass railing;
  * - furniture (desk clusters, plants, shelves, sofas) fills free floor beside the path;
  * - a coffee corner or two (E2a): where the office's people meet (world/crowd);
- * - a stand-up meeting corner (E2b): a high table and a whiteboard with a chart.
+ * - a stand-up meeting corner (E2b): a high table and a whiteboard with a chart;
+ * - an arcade machine (E3): in plain view of a stop, its screen facing it.
  *
  * Everything is made of primitives (boxes, cylinders, balls) in a few materials, so the renderer
  * can draw all of it with a handful of instanced meshes. Nothing may stand on `clear` floor.
  */
 import { seeded } from '@/lib/random'
-import { forward, right, type Box, type ClearRect, type Frame, type Vec3, type WorldLayout } from './layout'
+import { ENTRANCE_GEOMETRY, forward, right, type Box, type ClearRect, type Frame, type Vec3, type WorldLayout } from './layout'
 
 export type Mat =
   | 'wall'
@@ -78,6 +79,28 @@ export interface Sofa {
   yaw: number
 }
 
+/**
+ * An arcade machine (E3): the cabinet's floor point and yaw (front = the way it faces), its screen
+ * (a canvas texture drawn by world/arcade), where someone may stand and play, and the stop that
+ * sees it best (the camera flies from the rail into the screen).
+ */
+export interface ArcadeCabinet {
+  at: Vec3
+  yaw: number
+  screen: {
+    /** Centre of the screen's face (world) and its size [width, height] (m). */
+    center: Vec3
+    size: [number, number]
+    /** The way the screen faces (unit, on the floor plane). */
+    normal: [number, number]
+  }
+  /** Where someone plays it; `aside`: where they step to while the guest has it (out of the camera's way). */
+  player: { at: Vec3; yaw: number; aside: Vec3; asideYaw: number }
+  /** Index of the stop that sees it best, and from how far (m). */
+  station: number
+  seen: number
+}
+
 export interface Office {
   solid: Prim[]
   glass: Box[]
@@ -100,6 +123,8 @@ export interface Office {
   meeting: MeetingCorner[]
   /** Every sofa (E2b: someone may sleep on one). */
   sofas: Sofa[]
+  /** The arcade machine (E3), 0–1. */
+  arcade: ArcadeCabinet[]
 }
 
 export const OFFICE = {
@@ -211,7 +236,33 @@ export function seenFrom(
   return best
 }
 
-/** Transform primitives given in a prop's local space (+z = its front) into the world. */
+/**
+ * Where the camera looks at the arcade's screen from (E3): straight in front, at the distance where
+ * the whole screen fits the frame with ARCADE_CAB.margin round it (`aspect` = width / height).
+ */
+export function arcadeEye(center: Vec3, normal: [number, number], aspect: number): Vec3 {
+  const t = Math.tan((ENTRANCE_GEOMETRY.fov * Math.PI) / 360)
+  const [w, h] = ARCADE_CAB.screen.size
+  const d = Math.max(h / 2 / t, w / 2 / (t * aspect)) * ARCADE_CAB.margin
+  return [center[0] + normal[0] * d, center[1], center[2] + normal[1] * d]
+}
+
+/** Distance from (x, z) to the floor segment a → b. */
+function segmentDistance(x: number, z: number, a: Vec3, b: Vec3): number {
+  const dx = b[0] - a[0]
+  const dz = b[2] - a[2]
+  const len2 = dx * dx + dz * dz
+  const t = len2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[2]) * dz) / len2)) : 0
+  return Math.hypot(a[0] + dx * t - x, a[2] + dz * t - z)
+}
+
+/** A point in a prop's local space (+z = its front) in the world. */
+function placePoint(v: Vec3, at: Vec3, yaw: number): Vec3 {
+  const c = Math.cos(yaw)
+  const s = Math.sin(yaw)
+  return [at[0] + v[0] * c + v[2] * s, at[1] + v[1], at[2] - v[0] * s + v[2] * c]
+}
+
 function place(local: Prim[], at: Vec3, yaw: number): Prim[] {
   const c = Math.cos(yaw)
   const s = Math.sin(yaw)
@@ -338,6 +389,66 @@ const MEETING = {
   ],
 }
 
+/**
+ * The arcade machine (E3), front = +z: a cabinet in the page's accent (fabricA) with a dark screen
+ * housing, a control panel for two players (a joystick and two buttons each). The screen itself is a canvas
+ * texture in front of the housing (ARCADE_CAB.screen); the lit marquee on top goes with the
+ * ceiling lights (unlit, bright). Footprint ≈ 0.8 × 0.7.
+ */
+function arcadeCabinet(): Prim[] {
+  return [
+    box([0, 0.47, -0.02], [0.7, 0.94, 0.6], 'fabricA'),
+    box([0, 0.45, 0.285], [0.24, 0.3, 0.02], 'frame'),
+    box([-0.05, 0.52, 0.298], [0.03, 0.07, 0.01], 'metal'),
+    box([0.05, 0.52, 0.298], [0.03, 0.07, 0.01], 'metal'),
+    box([0, 0.98, 0.16], [0.74, 0.09, 0.36], 'frame'),
+    cyl([-0.26, 1.07, 0.2], 0.025, 0.1, 'metal'),
+    ball([-0.26, 1.13, 0.2], 0.065, 'bookA'),
+    cyl([-0.13, 1.035, 0.22], 0.055, 0.025, 'bookB'),
+    cyl([-0.05, 1.035, 0.2], 0.055, 0.025, 'bookC'),
+    cyl([0.1, 1.07, 0.2], 0.025, 0.1, 'metal'),
+    ball([0.1, 1.13, 0.2], 0.065, 'bookB'),
+    cyl([0.23, 1.035, 0.22], 0.055, 0.025, 'bookA'),
+    cyl([0.31, 1.035, 0.2], 0.055, 0.025, 'bookC'),
+    box([0, 1.4, -0.06], [0.7, 0.84, 0.56], 'frame'),
+    box([-0.37, 0.98, -0.02], [0.04, 1.96, 0.66], 'fabricA'),
+    box([0.37, 0.98, -0.02], [0.04, 1.96, 0.66], 'fabricA'),
+    box([0, 1.975, -0.02], [0.78, 0.03, 0.66], 'frame'),
+  ]
+}
+/** Where the arcade's parts are in its own space (front +z). */
+export const ARCADE_CAB = {
+  /** The screen: 2 cm in front of the housing's face (z 0.22), 4 : 3. */
+  screen: { center: [0, 1.4, 0.24] as Vec3, size: [0.56, 0.42] as [number, number] },
+  marquee: { center: [0, 1.88, 0.02] as Vec3, size: [0.7, 0.16, 0.5] as Vec3 },
+  /**
+   * The player stands square at player 1's controls, the left half of the panel (Dima 2026-11-18:
+   * standing off to the side, turned in, looked crooked). So that the stop still sees the screen
+   * past them, the cabinet is turned away from the stop by `turn` (rad), the stop on its right:
+   * the player is off the line of sight.
+   */
+  player: { at: [-0.3, 0, 0.7] as Vec3, yaw: Math.PI },
+  turn: -0.75,
+  /**
+   * Where the player steps to while the guest has the machine: out of the camera's way (it flies
+   * in on the middle, ≈ 0.7 m out, from the stop's side), to the left, turned to the screen.
+   */
+  aside: { at: [-0.95, 0, 0.42] as Vec3, yaw: Math.PI + 0.85 },
+  /** Free floor it needs: a circle this big around this point. */
+  footprint: { at: [0, 0, 0.2] as Vec3, r: 0.75 },
+  /** Seen from a stop this near … far (m): a smaller screen would not read, a nearer one crowds the frame. */
+  view: [3.5, 12] as const,
+  /** Within this share of the frame's half-width around where the stop looks: seen, not at the very edge. */
+  cone: 0.7,
+  /** The coffee corners and the meeting stay this far away (m). */
+  apart: 6.5,
+  /**
+   * Flying in, the screen fills the frame with this much of the cabinet round it (1 = edge to
+   * edge): room for the header above and the way-out button below, outside the screen.
+   */
+  margin: 1.24,
+}
+
 function lounge(): Prim[] {
   return [
     box([0, 0.22, -0.3], [1.9, 0.44, 0.84], 'fabricB'),
@@ -372,7 +483,8 @@ function partition(w: Box, solid: Prim[], glass: Box[], frosted: Box[]) {
   glass.push({ center: at(0, 1.6 + (H - 1.68) / 2), size: sized(0.03, H - 1.68, length), yaw })
 }
 
-export function buildOffice(layout: WorldLayout, seed = 11): Office {
+/** `aspect` (width / height of the screen) decides how wide the camera sees at a stop (E3). */
+export function buildOffice(layout: WorldLayout, seed = 11, aspect = 16 / 9): Office {
   const { walls, stairs, mezzanines, clear } = layout.architecture
   const solid: Prim[] = []
   const glass: Box[] = []
@@ -437,19 +549,98 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
   // ---- furniture beside each zone's free floor ----
   const sofas: Sofa[] = []
   const placed: { x: number; z: number; r: number }[] = []
+  // Lines of sight kept free (the arcade's, E3): nothing stands on them.
+  const sight: [Vec3, Vec3][] = []
   const fits = (x: number, z: number, r: number) =>
     x - r > bounds.minX + 1 &&
     x + r < bounds.maxX - 1 &&
     z - r > bounds.minZ + 1 &&
     z + r < bounds.maxZ - 1 &&
     !blocked(x, z, r, keepOff) &&
-    placed.every((p) => Math.hypot(p.x - x, p.z - z) > p.r + r + 0.4)
+    placed.every((p) => Math.hypot(p.x - x, p.z - z) > p.r + r + 0.4) &&
+    sight.every(([a, b]) => segmentDistance(x, z, a, b) > r + 0.3)
   const tryPlace = (local: Prim[], at: Vec3, yaw: number, r: number) => {
     if (at[1] > 0.01 || !fits(at[0], at[2], r)) return false
     placed.push({ x: at[0], z: at[2], r })
     solid.push(...place(local, at, yaw))
     return true
   }
+
+  // ---- an arcade machine (E3), first of the furniture (the floor beside the path fills up
+  // with desks): where a stop sees it best — no exhibit, no glass on the line (the camera flies
+  // there in a straight line) — its screen turned to that stop. The line stays free of whatever
+  // comes after (furniture, columns, the coffee, the meeting); the rest of the office is the same,
+  // bar a piece that would have stood on it ----
+  const arcade: ArcadeCabinet[] = []
+  const exhibitsInView = layout.stations.map((st) => ({ x: st.anchor[0], z: st.anchor[2], r: 2.4 }))
+  // Candidates in each ground-floor stop's frame (from a mezzanine the flight would dive through
+  // its railing), nearest first: the first that fits wins. A narrow (phone) frame may have no
+  // room beside the exhibits: then within a wide screen's frame — seen when the camera turns,
+  // walking past.
+  const tan = Math.tan((ENTRANCE_GEOMETRY.fov * Math.PI) / 360)
+  let arcBest: { at: Vec3; yaw: number; station: number; seen: number } | null = null
+  for (const a of aspect < 16 / 9 ? [aspect, 16 / 9] : [aspect]) {
+    arcBest ??= arcadeSpot(Math.atan(tan * a) * ARCADE_CAB.cone)
+  }
+  function arcadeSpot(halfWidth: number) {
+    const candidates: { at: Vec3; station: number; d: number }[] = []
+    const step = halfWidth / Math.max(2, Math.round(halfWidth / 0.08))
+    layout.stations.forEach((st, station) => {
+      if (st.viewpoint[1] > OFFICE.sill + 1.5) return
+      const look = Math.atan2(st.focus[0] - st.viewpoint[0], st.focus[2] - st.viewpoint[2])
+      for (let a = -halfWidth; a <= halfWidth + 1e-9; a += step) {
+        for (let d = ARCADE_CAB.view[0]; d <= ARCADE_CAB.view[1]; d += 0.5) {
+          candidates.push({ at: [st.viewpoint[0] + Math.sin(look + a) * d, 0, st.viewpoint[2] + Math.cos(look + a) * d], station, d })
+        }
+      }
+    })
+    candidates.sort((p, q) => p.d - q.d)
+    for (const { at, station, d } of candidates) {
+      const vp = layout.stations[station]!.viewpoint
+      const yaw = Math.atan2(vp[0] - at[0], vp[2] - at[2]) + ARCADE_CAB.turn
+      const foot = placePoint(ARCADE_CAB.footprint.at, at, yaw)
+      if (!fits(foot[0], foot[2], ARCADE_CAB.footprint.r)) continue
+      const player = placePoint(ARCADE_CAB.player.at, at, yaw)
+      if (!fits(player[0], player[2], 0.35)) continue
+      const aside = placePoint(ARCADE_CAB.aside.at, at, yaw)
+      if (!fits(aside[0], aside[2], 0.3)) continue
+      if (exhibitsInView.some((b) => lineHits(vp, at, b)) || walls.some((w) => crosses(vp, at, w))) continue
+      // The camera's way in, too: from the stop to straight in front of the screen.
+      const eye = arcadeEye(placePoint(ARCADE_CAB.screen.center, at, yaw), [Math.sin(yaw), Math.cos(yaw)], aspect)
+      if (walls.some((w) => crosses(vp, eye, w))) continue
+      if (exhibitsInView.some((b) => segmentDistance(b.x, b.z, vp, eye) <= b.r * 0.8)) continue
+      return { at, yaw, station, seen: d }
+    }
+    return null
+  }
+  if (arcBest) {
+    const { at, yaw, station, seen } = arcBest
+    const local = (v: Vec3) => placePoint(v, at, yaw)
+    const foot = local(ARCADE_CAB.footprint.at)
+    placed.push({ x: foot[0], z: foot[2], r: ARCADE_CAB.footprint.r })
+    solid.push(...place(arcadeCabinet(), at, yaw))
+    // Layout boxes carry a route heading: the mesh turns by −yaw.
+    lights.push({ center: local(ARCADE_CAB.marquee.center), size: ARCADE_CAB.marquee.size, yaw: -yaw })
+    const screen = local(ARCADE_CAB.screen.center)
+    arcade.push({
+      at,
+      yaw,
+      screen: { center: screen, size: ARCADE_CAB.screen.size, normal: [Math.sin(yaw), Math.cos(yaw)] },
+      player: {
+        at: local(ARCADE_CAB.player.at),
+        yaw: yaw + ARCADE_CAB.player.yaw,
+        aside: local(ARCADE_CAB.aside.at),
+        asideYaw: yaw + ARCADE_CAB.aside.yaw,
+      },
+      station,
+      seen,
+    })
+    // Nothing is placed on the line of sight nor on the way in (the flight checks the same).
+    const vp = layout.stations[station]!.viewpoint
+    sight.push([vp, screen], [vp, arcadeEye(screen, [Math.sin(yaw), Math.cos(yaw)], aspect)])
+  }
+  // The other gags keep their distance (they would pile up in one place).
+  const nearArcade = (x: number, z: number) => arcade.some((a) => Math.hypot(a.at[0] - x, a.at[2] - z) < ARCADE_CAB.apart)
 
   clear.forEach((c, ci) => {
     if (c.frame.level > 0 || ci === 0) return // nothing on mezzanines (handled) or in the entrance
@@ -480,6 +671,7 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
   for (let x = Math.ceil(bounds.minX / g) * g; x <= bounds.maxX; x += g) {
     for (let z = Math.ceil(bounds.minZ / g) * g; z <= bounds.maxZ; z += g) {
       if (blocked(x, z, 0.6, keepOff) || placed.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + 0.6)) continue
+      if (sight.some(([a, b]) => segmentDistance(x, z, a, b) < 0.6)) continue
       solid.push(box([x, H / 2, z], [0.45, H, 0.45], 'wall'))
       columns.push({ x, z, r: 0.3 })
     }
@@ -515,7 +707,7 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
     const toWorld = (v: Vec3): Vec3 => [at[0] + v[0] * c + v[2] * sn, at[1] + v[1], at[2] - v[0] * sn + v[2] * c]
     const spots = COFFEE_SPOTS.map((sp) => ({ at: toWorld(sp.at), yaw: sp.yaw + yaw }))
     if (!free(at[0], at[2], 0.8) || !spots.every((sp) => free(sp.at[0], sp.at[2], 0.45))) continue
-    if (coffee.some((k) => Math.hypot(k.at[0] - at[0], k.at[2] - at[2]) < 12)) continue
+    if (coffee.some((k) => Math.hypot(k.at[0] - at[0], k.at[2] - at[2]) < 12) || nearArcade(at[0], at[2])) continue
     placed.push({ x: at[0], z: at[2], r: 0.8 })
     solid.push(...place(coffeeCounter(), at, yaw))
     coffee.push({ at, yaw, steam: toWorld(COFFEE_STEAM), spots })
@@ -549,7 +741,7 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
     const centre = toWorld([0, 0, -0.5])
     const people = [MEETING.presenter, ...MEETING.attendees].map((p) => toWorld(p.at))
     if (!free(centre[0], centre[2], 1.3) || !people.every((p) => free(p[0], p[2], 0.4))) continue
-    if (coffee.some((k) => Math.hypot(k.at[0] - centre[0], k.at[2] - centre[2]) < 8)) continue
+    if (coffee.some((k) => Math.hypot(k.at[0] - centre[0], k.at[2] - centre[2]) < 8) || nearArcade(centre[0], centre[2])) continue
     placed.push({ x: centre[0], z: centre[2], r: 1.3 })
     solid.push(...place(meetingCorner(), base, yaw))
     meeting.push({
@@ -620,5 +812,6 @@ export function buildOffice(layout: WorldLayout, seed = 11): Office {
     coffee,
     meeting,
     sofas,
+    arcade,
   }
 }

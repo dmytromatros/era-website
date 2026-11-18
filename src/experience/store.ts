@@ -1,7 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
-import type { ActorDef, CutsceneTexts, Page, Welcome } from '@/content/schema'
+import type { ActorDef, ArcadeTexts, CutsceneTexts, Page, Welcome } from '@/content/schema'
 import type { PageElements } from './measure'
 
 /** What the current route hands to the persistent 3D canvas. Plain data, no JSX. */
@@ -22,6 +22,8 @@ export interface SceneData {
   welcome?: Welcome & { def: ActorDef }
   /** The entrance cutscene's end hint (texts of this locale). */
   cutscene?: CutsceneTexts
+  /** The arcade machine's texts (E3); absent = its screen stays dark. */
+  arcade?: ArcadeTexts
 }
 
 /**

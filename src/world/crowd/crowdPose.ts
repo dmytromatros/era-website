@@ -8,7 +8,7 @@
  */
 import type { Vec3 } from '../layout'
 import { alongPath } from './navGrid'
-import { burstTime, CROWD, JOLT, MEET, meetTime, reactTime, type Crowd, type Person, type Reaction } from './crowdModel'
+import { burstTime, CROWD, JOLT, LOSE, MEET, meetTime, reactTime, type Crowd, type Person, type Reaction } from './crowdModel'
 
 export interface Pose {
   /** Floor point under the hips, facing, and how far the body is raised / lowered (m). */
@@ -150,6 +150,56 @@ function jolt(t: number, u: number): Joints {
     lift: 0,
   }
   return mix(lying, sitting, up)
+}
+
+/**
+ * At the arcade machine (E3): leaning in, eyes on the screen, the left hand rattling the joystick
+ * and the right one mashing the buttons; the body sways into the game.
+ */
+function playing(t: number, ph: number): Joints {
+  const lean = Math.sin(t * 1.9 + ph)
+  return {
+    ...ZERO,
+    torsoX: 0.08,
+    torsoZ: lean * 0.06,
+    headX: 0.16 + Math.sin(t * 0.7) * 0.03,
+    headY: -0.25 + lean * 0.05,
+    lift: Math.max(0, Math.sin(t * 5.3 + ph)) * 0.012,
+    armLX: -0.95 + Math.sin(t * 6.1) * 0.08,
+    armLZ: 0.12 + Math.sin(t * 4.7 + 1) * 0.1,
+    foreL: -0.55,
+    armRX: -0.95,
+    armRZ: -0.22,
+    foreR: -0.5 - Math.abs(Math.sin(t * 15 + ph)) * 0.2,
+  }
+}
+
+/** The loss (u seconds in): frozen, arms thrown up, two bangs of the fists on the panel, back. */
+function losing(base: Joints, u: number): Joints {
+  const shock = smooth(u / 0.12) * (1 - smooth((u - LOSE.shock) / 0.15))
+  const up = smooth((u - LOSE.shock) / 0.15) * (1 - smooth((u - LOSE.up) / 0.15))
+  const slam = smooth((u - LOSE.up) / 0.12) * (1 - smooth((u - LOSE.slam) / 0.3))
+  const bang = Math.abs(Math.sin(((u - LOSE.up) / (LOSE.slam - LOSE.up)) * Math.PI * 2))
+  const frozen = { ...base, torsoX: -0.12, headX: -0.15, armLZ: 0.3, armRZ: -0.4, foreL: -0.2, foreR: -0.2, lift: 0 }
+  const noooo = { ...base, torsoX: -0.2, headX: -0.4, headY: 0, armLX: -0.4, armRX: -0.4, armLZ: -2.5, armRZ: 2.5, foreL: -0.15, foreR: -0.15, lift: Math.sin(Math.min(1, (u - LOSE.shock) / 0.4) * Math.PI) * 0.06 }
+  // The fists come down on the panel; the body only nods with them (leaning in, the head went
+  // through the cabinet — Dima 2026-11-18).
+  const fists = { ...base, torsoX: 0.06 + 0.06 * bang, headX: 0.1 + 0.12 * bang, armLX: -1.25 + 0.45 * bang, armRX: -1.25 + 0.45 * bang, armLZ: 0.05, armRZ: -0.05, foreL: -0.25, foreR: -0.25 }
+  return mix(mix(mix(base, frozen, shock), noooo, up), fists, slam)
+}
+
+/** The guest took over the machine: they step aside, hands on hips, and watch the screen. */
+function watching(t: number, ph: number): Joints {
+  return {
+    ...ZERO,
+    headY: -0.45 + Math.sin(t * 0.5 + ph) * 0.12,
+    headX: 0.08,
+    torsoZ: Math.sin(t * 0.8) * 0.02,
+    armLZ: -0.42,
+    armRZ: 0.42,
+    foreL: -1.5,
+    foreR: -1.5,
+  }
 }
 
 /** Hips sit this much lower than standing (seat top ≈ 0.5 m, hips 0.62 m up when standing). */
@@ -440,6 +490,20 @@ function basePose(c: Crowd, i: number, now: number): Pose {
       const j = u >= 0 && u < JOLT.total ? jolt(t, u) : sleeping(t, 0)
       // Feet 0.89 m from the seat's centre (the 1.78 m body centred), on top of the seat.
       return { at: [spot.at[0] - x[0] * 0.89, spot.at[1] + 0.17, spot.at[2] - x[2] * 0.89], yaw: spot.yaw - Math.PI / 2, ...j }
+    }
+    case 'play': {
+      // The guest takes over the machine: a step aside, out of the camera's way, and watching
+      // (eased both ways over 0.6 s).
+      const k = smooth((now - c.guestSince) / 0.6)
+      const aside = c.guestPlays ? k : 1 - k
+      const u = now - p.bonkAt
+      const base = mix(playing(t, ph), watching(t, ph), aside)
+      const to = spot.aside ?? { at: spot.at, yaw: spot.yaw }
+      return {
+        at: [spot.at[0] + (to.at[0] - spot.at[0]) * aside, spot.at[1], spot.at[2] + (to.at[2] - spot.at[2]) * aside],
+        yaw: turn(spot.yaw, to.yaw, aside),
+        ...(aside === 0 && u >= 0 && u < LOSE.total ? losing(base, u) : base),
+      }
     }
     case 'pace': {
       // Up and down on the phone: walk to the far end, a pause to turn, walk back.

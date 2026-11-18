@@ -21,7 +21,7 @@ for (const [name, aspect] of [
 ] as const) {
   describe(`the office's people (${name} screen)`, () => {
     const layout = layoutRoute(plan, sizes, aspect)
-    const office = buildOffice(layout)
+    const office = buildOffice(layout, undefined, aspect)
     const grid = buildNavGrid(office)
     const spots = crowdSpots(office, layout, grid)
     const clear = office.keepOff

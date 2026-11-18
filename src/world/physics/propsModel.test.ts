@@ -16,7 +16,7 @@ for (const [name, aspect] of [
 ] as const) {
   describe(`props (${name} screen)`, () => {
     const layout = layoutRoute(plan, sizes, aspect)
-    const office = buildOffice(layout)
+    const office = buildOffice(layout, undefined, aspect)
     const skip = [0, layout.stations.length - 1]
     // Every exhibit 4 m wide, with a character standing just left of it (like a side helper).
     const exhibits: StopExhibit[] = layout.stations.map((st, i) => ({

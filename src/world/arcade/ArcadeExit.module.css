@@ -1,0 +1,68 @@
+/* The arcade's way out (E3): a pill at the bottom, like the cutscene's hint, above the canvas and
+   below the header. Hidden (and not focusable) unless the visitor is inside the machine. */
+.wrap {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 19;
+  transform: translate(-50%, 16px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+
+.shown {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+  transition-delay: 0.5s; /* once the camera is nearly at the screen */
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface) 88%, transparent);
+  color: var(--ui-text);
+  font: 700 14px/1 var(--font-sans);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.arrow {
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-left: 2px;
+}
+
+.key {
+  font: 600 11px/1 var(--font-sans);
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--ui-border);
+  opacity: 0.7;
+}
+
+/* No Esc key on a touch screen. */
+@media (hover: none) {
+  .key {
+    display: none;
+  }
+}

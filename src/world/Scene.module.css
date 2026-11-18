@@ -10,6 +10,12 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Inside the arcade (E3): the characters' bubbles around the frame would sit over the screen. */
+:global(html[data-arcade]) .overlay {
+  opacity: 0;
 }
 
 /* The entrance cutscene (world/cutscene): cinema bars while the scene plays (html[data-cutscene],

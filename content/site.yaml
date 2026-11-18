@@ -24,3 +24,31 @@ cutscene:
   en:
     hint: "Scroll to continue"
     hintTouch: "Swipe to continue"
+# The arcade machine in the office (wow-plan E3): its screen (pixel font — upper case, A–Z, 0–9
+# and . , ! ? : ' % / ( ) + # - * = < > only; a line holds 30) and the button that flies the
+# visitor back out. Click the screen in 3D to fly into it; the game is not there yet.
+arcade:
+  en:
+    title: "DFRNC"
+    subtitle: "ARCADE"
+    insertCoin: "INSERT COIN"
+    hiScore: "HI-SCORE"
+    gameOver: "GAME OVER"
+    comeCloser: "COME CLOSER"
+    game:
+      coinHint: "CLICK TO INSERT COIN"
+      coinHintTouch: "TAP TO INSERT COIN"
+      credit: "CREDIT"
+      loading: "LOADING"
+      stuck: "STILL LOADING..."
+      again: "NICE TRY. STILL 99%"
+      soon: "COMING SOON"
+      soonNote: "OUR DEV IS STILL ON LEVEL 1"
+      scoresTitle: "HIGH SCORES"
+      exitHint: "ESC TO LEAVE"
+      exitHintTouch: "BACK TO LEAVE"
+    scores:
+      - { name: BOHDAN, score: 999999, note: "HELD THE HEADING ONE-HANDED" }
+      - { name: DIANA, score: 4200, note: "SPILLED THE COFFEE" }
+      - { name: YOU, score: 0, note: "JUST GOT HERE" }
+    back: "Back to the office"

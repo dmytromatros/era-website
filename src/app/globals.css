@@ -55,9 +55,9 @@ body {
     color 0.3s;
 }
 
-/* A cutscene (D1/D3, experience/scrollLock.ts): the visitor cannot scroll — the scene may.
-   The gutter keeps the layout from shifting when the scrollbar goes. */
-html[data-cutscene] {
+/* A cutscene (D1/D3) or the arcade (E3) holds the page (experience/scrollLock.ts): the visitor
+   cannot scroll — the scene may. The gutter keeps the layout from shifting when the scrollbar goes. */
+html[data-scroll-lock] {
   overflow: hidden;
   overscroll-behavior: none;
   scrollbar-gutter: stable;

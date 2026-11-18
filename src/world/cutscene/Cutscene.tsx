@@ -21,7 +21,7 @@ export function Cutscene({ timing, welcome }: { timing: Timing; welcome: boolean
   // Leaving the page (or a hot reload) never leaves the scroll locked, nor the hint up.
   useEffect(
     () => () => {
-      unlockScroll()
+      unlockScroll('cutscene')
       hint.current?.()
       cutsceneNow.phase = 'idle'
     },
@@ -55,8 +55,8 @@ export function Cutscene({ timing, welcome }: { timing: Timing; welcome: boolean
       }
     }
     cutsceneNow.phase = state.phase
-    if (out.lock) lockScroll()
-    else unlockScroll()
+    if (out.lock) lockScroll('cutscene')
+    else unlockScroll('cutscene')
     if (out.scroll !== null && max > 0) {
       const y = (out.scroll / totalUnits(timing.segments)) * max
       if (Math.abs(window.scrollY - y) > 0.5) window.scrollTo(0, y)

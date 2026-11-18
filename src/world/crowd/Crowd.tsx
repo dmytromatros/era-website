@@ -12,7 +12,8 @@ import { useQualitySettings } from '../quality'
 import { useStylePreset } from '../style'
 import { applyToon } from '../toonMaterial'
 import { callAttention, cameraStill } from './attention'
-import { burstTime, CROWD, crowdSpots, JOLT, MEET, meetTime, newCrowd, poke, reactTime, stepCrowd } from './crowdModel'
+import { burstTime, CROWD, crowdSpots, guestAtArcade, JOLT, LOSE, MEET, meetTime, newCrowd, poke, reactTime, stepCrowd } from './crowdModel'
+import { arcadeLink, useArcade } from '../arcade/arcadeState'
 import { useExperience } from '@/experience/store'
 import { lookAtGuest, onSpinningChair, poseOf } from './crowdPose'
 import { chairKey, chairTurns } from '../physics/chairSpin'
@@ -157,7 +158,7 @@ const PUFF = new THREE.IcosahedronGeometry(0.5, 1)
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0)
 const noRaycast = () => null
 /** Tasks in which a person stands or walks (a capsule for the props). */
-const STANDING = new Set(['chat', 'pace', 'present', 'meet', 'walk'])
+const STANDING = new Set(['chat', 'pace', 'present', 'meet', 'walk', 'play'])
 
 /** Who is where is dealt anew on every page load (Dima: "different every time"). */
 const PAGE_SEED = Math.floor(Math.random() * 2 ** 31)
@@ -219,6 +220,13 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
     materials.shadow.opacity = world.shadowOpacity
   }, [materials, world])
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials])
+  // Gone (back to 2D, another page): nobody plays the arcade any more.
+  useEffect(
+    () => () => {
+      arcadeLink.playing = false
+    },
+    [],
+  )
 
   const body = useRef<THREE.InstancedMesh>(null)
   const torsos = useRef<THREE.InstancedMesh>(null)
@@ -376,6 +384,13 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       still: cameraStill.still,
     })
     if (call) callAttention(call)
+    // The arcade (E3): its player steps aside while the guest is in the machine; the screen shows
+    // their game (and "game over" when they lose) only if they are shown at all.
+    guestAtArcade(crowd, useArcade.getState().phase !== 'idle', now)
+    let playing = -1
+    for (let i = 0; i < people; i++) if (crowd.people[i]!.task === 'play') playing = i
+    arcadeLink.playing = playing >= 0 && !crowd.guestPlays
+    arcadeLink.lostAt = playing >= 0 ? crowd.people[playing]!.bonkAt + LOSE.over : -Infinity
     const b = body.current
     const e = eyes.current
     const s = shadows.current

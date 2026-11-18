@@ -127,7 +127,7 @@ export function buildPreview(
   if (!first) return null
   const style = officeStyle(sceneKey, page)
   const transform = previewTransform(first.viewpoint, first.focus, look)
-  const office = cullInFront(buildOffice(layout, style.seed), transform)
+  const office = cullInFront(buildOffice(layout, style.seed, aspect), transform)
   const block = page.blocks[plan.stops[0]!.blockIndex]
   const hero =
     block && block.type === 'hero'
