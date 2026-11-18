@@ -1,10 +1,11 @@
 'use client'
 
-import { useThree } from '@react-three/fiber'
-import { useEffect, useMemo } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { seeded } from '@/lib/random'
 import { useTheme } from '@/theme/store'
+import { dayColor, dayFrame } from './daylight/dayFrame'
 
 const TILE_PX = 512
 /** One texture tile covers this many metres: 12 rows of 20 cm planks. */
@@ -52,10 +53,20 @@ export function Floor() {
 
   useEffect(() => () => texture.dispose(), [texture])
 
+  // Unlit, so the time of day (E6) tints it: warmer at sunset, dimmer under the evening lamps.
+  // White (as is) at the top of the page — the floor shows in the 2D → 3D swap frame.
+  const material = useRef<THREE.MeshBasicMaterial>(null)
+  const seen = useRef(-1)
+  useFrame(() => {
+    if (!material.current || seen.current === dayFrame.version) return
+    seen.current = dayFrame.version
+    dayColor(material.current.color, '#ffffff', dayFrame.floor)
+  })
+
   return (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0, -SIZE / 2 + 60]}>
       <planeGeometry args={[SIZE, SIZE]} />
-      <meshBasicMaterial map={texture} />
+      <meshBasicMaterial ref={material} map={texture} />
     </mesh>
   )
 }
