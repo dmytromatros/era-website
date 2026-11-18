@@ -69,13 +69,19 @@ export interface QualitySettings {
    * the letter is its glyph moved by the kinetic text's shader (no draw call), a few numbers a frame.
    */
   letterKnock: boolean
+  /**
+   * Time of day behind the windows from the visitor's clock (E6): sun, sky light, windows, lamps,
+   * air, floor tint. On everywhere: a dozen colour lerps a frame while it fades in, then nothing
+   * until the clock moves the light; no shader, no draw call. Off = always the theme's day.
+   */
+  daylight: boolean
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, physicsHz: 30, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10, waves: 0, shards: 16, walkHands: false, crowd: 5, arcadeFps: 0, arcadeGameFps: 15, letterKnock: true },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0, waves: 160, shards: 28, walkHands: true, crowd: 12, arcadeFps: 10, arcadeGameFps: 30, letterKnock: true },
-  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 16, portalScale: 1, portalMaxFps: 0, waves: 256, shards: 40, walkHands: true, crowd: 20, arcadeFps: 12, arcadeGameFps: 30, letterKnock: true },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, physicsHz: 30, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10, waves: 0, shards: 16, walkHands: false, crowd: 5, arcadeFps: 0, arcadeGameFps: 15, letterKnock: true, daylight: true },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0, waves: 160, shards: 28, walkHands: true, crowd: 12, arcadeFps: 10, arcadeGameFps: 30, letterKnock: true, daylight: true },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 16, portalScale: 1, portalMaxFps: 0, waves: 256, shards: 40, walkHands: true, crowd: 20, arcadeFps: 12, arcadeGameFps: 30, letterKnock: true, daylight: true },
 }
 
 const STORAGE_KEY = 'era-quality'

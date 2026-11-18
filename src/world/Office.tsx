@@ -13,6 +13,7 @@ import { useQualitySettings } from './quality'
 import { createScreenMaterial } from './screenMaterial'
 import { useStylePreset } from './style'
 import { applyToon, liveTime } from './toonMaterial'
+import { dayColor, dayFrame } from './daylight/dayFrame'
 
 const BOX = new THREE.BoxGeometry(1, 1, 1)
 const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 16)
@@ -228,15 +229,26 @@ export function Office({
       ceiling: new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.95 }),
     }
   }, [])
+  const daySeen = useRef(-1)
   useLayoutEffect(() => {
     materials.glass.color.set(o.glass)
     materials.glass.opacity = o.glassOpacity
     materials.frosted.color.set(o.frosted)
     materials.frosted.opacity = o.frostedOpacity
-    materials.light.color.set(o.light)
-    materials.window.color.set(o.window)
     materials.ceiling.color.set(o.ceiling)
+    // Windows and lamps: the theme's colours, blended to the time of day (E6) — see below.
+    dayColor(materials.light.color, o.light, dayFrame.lamp)
+    dayColor(materials.window.color, o.window, dayFrame.window)
+    daySeen.current = dayFrame.version
   }, [materials, o])
+  // The time of day (E6, set by <Atmosphere> each frame): unlit windows show the sky, the ceiling
+  // lamps turn warm in the evening. Two colour writes, only when the time or the fade moved.
+  useFrame(() => {
+    if (daySeen.current === dayFrame.version) return
+    daySeen.current = dayFrame.version
+    dayColor(materials.light.color, o.light, dayFrame.lamp)
+    dayColor(materials.window.color, o.window, dayFrame.window)
+  })
   // Cartoon light response for the opaque office surfaces (wow-plan A2; glass stays as is).
   useLayoutEffect(() => {
     applyToon(materials.solid, preset)
