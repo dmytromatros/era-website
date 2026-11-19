@@ -12,10 +12,11 @@ import { useQualitySettings } from '../quality'
 import { useStylePreset } from '../style'
 import { applyToon } from '../toonMaterial'
 import { callAttention, cameraStill } from './attention'
-import { burstTime, CROWD, crowdSpots, guestAtArcade, JOLT, LOSE, MEET, meetTime, newCrowd, poke, reactTime, stepCrowd } from './crowdModel'
+import { burstTime, CROWD, crowdSpots, guestAtArcade, isPhotoPose, JOLT, LOSE, MEET, meetTime, newCrowd, photoPose, poke, reactTime, stepCrowd } from './crowdModel'
+import { photoCue, photoTurn, takesCue } from '../photo/photoModel'
 import { arcadeLink, useArcade } from '../arcade/arcadeState'
 import { useExperience } from '@/experience/store'
-import { lookAtGuest, onSpinningChair, poseOf } from './crowdPose'
+import { lookAtGuest, onSpinningChair, poseOf, turnToCamera } from './crowdPose'
 import { chairKey, chairTurns } from '../physics/chairSpin'
 import { crowdColliders, MAX_CROWD_COLLIDERS } from '../physics/protocol'
 import { floorOptions, pickFloorGroups } from './floorModel'
@@ -345,6 +346,8 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
   const extrasShown = useRef({ bars: [] as boolean[], zzz: false })
   // E2d: each person's head, eased towards the guest (yaw, pitch, weight).
   const looks = useRef<{ yaw: number; pitch: number; w: number }[]>([])
+  /** The photo mode's last cue taken (E7). */
+  const photoSeen = useRef(0)
 
   // `?debug=1`: who is where, doing what, and where their heads are on screen (for checks).
   const camera = useThree((s) => s.camera)
@@ -384,6 +387,11 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       still: cameraStill.still,
     })
     if (call) callAttention(call)
+    // The visitor's camera is up (E7): whoever was in the frame last frame turns to it and poses.
+    if (takesCue(photoSeen.current, now)) {
+      photoSeen.current = photoCue.id
+      for (let i = 0; i < people; i++) if (shown.current[i]) photoPose(crowd, i, now)
+    }
     // The arcade (E3): its player steps aside while the guest is in the machine; the screen shows
     // their game (and "game over" when they lose) only if they are shown at all.
     guestAtArcade(crowd, useArcade.getState().phase !== 'idle', now)
@@ -413,6 +421,15 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
         const turning = chairTurns.get(chairKey(seat.at))
         if (turning) pose = onSpinningChair(pose, seat.at, turning.angle, turning.speed)
       }
+      // Posing for the photo (E7): the whole body round to the camera, then back as it was — on
+      // the spot, or at a desk on the swivel chair.
+      if (isPhotoPose(person.react)) {
+        const w = photoTurn(now - person.reactAt)
+        if (w > 0) {
+          const seated = person.task === 'type' && seat.kind === 'desk'
+          pose = turnToCamera(pose, [camera.position.x, camera.position.y, camera.position.z], w, seated ? seat.at : undefined)
+        }
+      }
       // Standing or walking: a solid for the props (seated ones are behind desks and glass).
       if (STANDING.has(person.task) && solids.length < MAX_CROWD_COLLIDERS * 3) solids.push(pose.at[0], pose.at[1], pose.at[2])
       sphere.center.set(pose.at[0], pose.at[1] + 0.9, pose.at[2])
@@ -436,7 +453,8 @@ export function Crowd({ office, layout, floor }: { office: Office; layout: World
       // E2d: the head turns to the guest passing by (eased, so it follows, not snaps).
       // Not while their head is busy: banging it, hiding it.
       const busy = (person.task === 'type' && now - person.bonkAt < CROWD.bonkTime) || (person.react === 'hide' && now - person.reactAt < reactTime('hide'))
-      const want = busy ? { yaw: 0, pitch: 0, weight: 0 } : lookAtGuest(pose, [camera.position.x, camera.position.y, camera.position.z])
+      const posing = isPhotoPose(person.react) && now - person.reactAt < reactTime(person.react)
+      const want = busy ? { yaw: 0, pitch: 0, weight: 0 } : lookAtGuest(pose, [camera.position.x, camera.position.y, camera.position.z], posing)
       const lk = (looks.current[i] ??= { yaw: 0, pitch: 0, w: 0 })
       const k = 1 - Math.exp(-Math.min(dt, 0.1) * 4)
       lk.yaw += (want.yaw - lk.yaw) * k

@@ -202,6 +202,11 @@ export const actorSchema = z.object({
   annoyed: reactionSchema.default({ move: 'shrug', emoji: '😤' }),
   /** Played when a pushed ball or box hits the character (C2). */
   hit: reactionSchema.default({ move: 'surprised', emoji: '😲' }),
+  /**
+   * The photo mode (E7): how they pose for the visitor's camera (one of the photo poses: thumbs,
+   * peace, flex — any move works). Default: one of those by the character's id.
+   */
+  pose: reactionSchema.optional(),
 })
 
 export type ActorDef = z.infer<typeof actorSchema> & { id: string }
@@ -284,6 +289,25 @@ export const monitorSchema = z.object({
 
 export type MonitorTexts = z.infer<typeof monitorSchema>
 
+/**
+ * The photo mode (wow-plan E7): the header button, what the polaroid says under the picture and
+ * its buttons. Absent = no photo button.
+ */
+export const photoSchema = z.object({
+  /** The header button. */
+  button: z.string().min(1).max(14),
+  /** Big on the screen as the shutter clicks. */
+  cheese: z.string().min(1).max(16),
+  /** Under the picture on the polaroid (drawn into the PNG). */
+  caption: z.string().min(1).max(40),
+  save: z.string().min(1).max(14),
+  /** The same button on a phone: it opens the system share sheet. */
+  share: z.string().min(1).max(14),
+  close: z.string().min(1).max(14),
+})
+
+export type PhotoTexts = z.infer<typeof photoSchema>
+
 export const siteSchema = z.object({
   name: z.string().min(1),
   defaultLocale: z.string().min(2),
@@ -298,6 +322,8 @@ export const siteSchema = z.object({
   arcade: z.record(z.string(), arcadeSchema).optional(),
   /** Per locale: the monitor's texts (E5); absent = no monitor in the office. */
   monitor: z.record(z.string(), monitorSchema).optional(),
+  /** Per locale: the photo mode's texts (E7); absent = no photo button. */
+  photo: z.record(z.string(), photoSchema).optional(),
 })
 
 export type Site = z.infer<typeof siteSchema>

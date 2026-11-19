@@ -29,5 +29,7 @@ export type AccessoryName = (typeof ACCESSORIES)[number]
  * What a character does when clicked (C1): a short move on top of its activity, plus an emoji.
  * Implemented in `src/actors/reactions.ts` (same three steps as above to add one).
  */
-export const REACTIONS = ['jump', 'spin', 'surprised', 'dance', 'shrug'] as const
+export const REACTIONS = ['jump', 'spin', 'surprised', 'dance', 'shrug', 'thumbs', 'peace', 'flex'] as const
+/** Moves made for the photo mode (E7): held for the whole countdown, facing the camera. */
+export const PHOTO_MOVES = ['thumbs', 'peace', 'flex'] as const satisfies readonly ReactionName[]
 export type ReactionName = (typeof REACTIONS)[number]

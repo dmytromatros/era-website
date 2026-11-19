@@ -10,6 +10,7 @@ import { ThemeSwitch } from '@/theme/ThemeSwitch'
 import { StyleSwitch } from '@/world/StyleSwitch'
 import { DaylightSwitch } from '@/world/daylight/DaylightSwitch'
 import { XRaySwitch } from '@/world/XRaySwitch'
+import { PhotoButton } from '@/world/photo/PhotoButton'
 import styles from './Header.module.css'
 
 interface Props {
@@ -51,6 +52,7 @@ export function Header({ siteName, locale, nav }: Props) {
         })}
       </nav>
       <div className={styles.tools}>
+        <PhotoButton />
         <ModeSwitch />
         <StyleSwitch />
         <DaylightSwitch />

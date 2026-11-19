@@ -8,3 +8,5 @@ accessories: [headphones, badge]
 reactions:
   - { move: jump, emoji: "💪" }
   - { move: surprised, emoji: "😅" }
+# Photo mode (E7): his hands hold the headline, so he just grins into the camera.
+pose: { move: peace, emoji: "😁" }

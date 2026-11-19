@@ -14,9 +14,11 @@
 }
 
 /* Inside the arcade (E3), or flying into the monitor (E5): the characters' bubbles around the
-   frame would sit over the screen. */
+   frame would sit over the screen. Taking a photo (E7): everyone poses, nobody talks — the frame
+   is what the picture will be (the bubbles are HTML, not in it). */
 :global(html[data-arcade]) .overlay,
-:global(html[data-monitor]) .overlay {
+:global(html[data-monitor]) .overlay,
+:global(html[data-photo]) .overlay {
   opacity: 0;
 }
 

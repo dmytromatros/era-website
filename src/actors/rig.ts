@@ -56,6 +56,7 @@ export function resetPose(j: Joints) {
   j.armR.position.y = BODY.shoulderY
   j.eyes.position.set(0, EYES.y, EYES.z)
   j.eyes.scale.set(1, 1, 1)
+  j.mouth.scale.x = 1
 }
 
 /** Proportions shared by the body, props and labels (in actor units, feet at y = 0). */

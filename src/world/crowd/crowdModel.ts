@@ -16,6 +16,7 @@
  *   plays for nobody. Some of them call the camera's attention (crowd/attention.ts): it glances
  *   over, zooms in and pulls focus.
  */
+import { PHOTO, PHOTO_TURN } from '../photo/photoModel'
 import { seeded } from '@/lib/random'
 import type { Vec3, WorldLayout } from '../layout'
 import { seenFrom, type Office } from '../officeModel'
@@ -137,13 +138,58 @@ export interface Person {
   pokes: number
   /** E2d: when they last noticed the guest (scene time). */
   noticedAt: number
+  /** E7: a walk halted for the photo — from when, how long (scene s); the walk carries on after. */
+  pauseAt: number
+  pauseFor: number
 }
 
 /** What a person does when clicked: in turn, and a shrug when clicked again and again. */
-export type Reaction = 'jump' | 'wave' | 'surprised' | 'shrug' | 'hide'
+export type Reaction = 'jump' | 'wave' | 'surprised' | 'shrug' | 'hide' | PhotoPose
+/** The photo mode (E7): how a person of the crowd poses for the visitor's camera. */
+export type PhotoPose = 'thumbs' | 'peace' | 'cheer'
+export const PHOTO_POSES: readonly PhotoPose[] = ['thumbs', 'peace', 'cheer']
 export const REACT = { time: 1.3, hideTime: 2.6, order: ['jump', 'wave', 'surprised'] as const, annoyedAfter: 3, window: 2.5 } as const
-/** How long a reaction lasts (hiding behind the monitor is longer: duck, wait, peek). */
-export const reactTime = (r: Reaction) => (r === 'hide' ? REACT.hideTime : REACT.time)
+export const isPhotoPose = (r: Reaction): r is PhotoPose => (PHOTO_POSES as readonly string[]).includes(r)
+/** How long a reaction lasts (hiding behind the monitor is longer: duck, wait, peek; a photo pose holds through the countdown). */
+export const reactTime = (r: Reaction) => (r === 'hide' ? REACT.hideTime : isPhotoPose(r) ? PHOTO.pose : REACT.time)
+
+/**
+ * E7: the visitor's camera is up and person `i` is in the frame — they turn to it and pose (each
+ * their own pose, by their phase). Not the sleeper (asleep is the joke), not the arcade's player
+ * (the game is on), not someone still hiding behind the monitor.
+ */
+export function photoPose(c: Crowd, i: number, now: number): boolean {
+  const p = c.people[i]
+  if (!p || p.task === 'sleep' || p.task === 'play') return false
+  if (p.react === 'hide' && now - p.reactAt < REACT.hideTime) return false
+  p.react = PHOTO_POSES[Math.floor(Math.abs(p.phase) * 997) % PHOTO_POSES.length]!
+  p.reactAt = now
+  // On the way somewhere: stop, turn round, pose, then walk on from the same spot.
+  if (p.task === 'walk') {
+    p.pauseAt = now
+    p.pauseFor = PHOTO_TURN.back + PHOTO_TURN.out
+  }
+  return true
+}
+
+/** Seconds walked so far on the current walk (a photo's halt does not count). */
+export function walkTime(p: Pick<Person, 'since' | 'pauseAt' | 'pauseFor'>, now: number): number {
+  const t = now - p.since
+  if (!(p.pauseAt >= p.since)) return t
+  return t - Math.min(Math.max(now - p.pauseAt, 0), p.pauseFor)
+}
+
+/** 0 → 1 → 0: how much a walker stands still for the photo now (eases out of / back into the stride). */
+export function walkHalt(p: Pick<Person, 'since' | 'pauseAt' | 'pauseFor'>, now: number): number {
+  if (!(p.pauseAt >= p.since)) return 0
+  const u = now - p.pauseAt
+  if (u <= 0 || u >= p.pauseFor) return 0
+  const s = (x: number) => {
+    const k = Math.min(Math.max(x, 0), 1)
+    return k * k * (3 - 2 * k)
+  }
+  return Math.min(s(u / 0.3), s((p.pauseFor - u) / 0.4))
+}
 
 /**
  * E2d — they notice the guest (the camera) walking past: someone near, who can see the camera
@@ -341,6 +387,8 @@ export function newCrowd(spots: Spot[], count: number, seed: number, now = 0, st
       clicks: [],
       pokes: 0,
       noticedAt: -Infinity,
+      pauseAt: -Infinity,
+      pauseFor: 0,
     })
   }
   const quiet = {
@@ -554,7 +602,7 @@ function noticeGuest(c: Crowd, now: number, view: View) {
 
 /** Where a person is on the floor right now (their spot, or on their walk). */
 function placeOf(c: Crowd, p: Person, now: number): Vec3 {
-  if (p.task === 'walk') return alongPath(p.path, (now - p.since) * CROWD.walkSpeed).at
+  if (p.task === 'walk') return alongPath(p.path, walkTime(p, now) * CROWD.walkSpeed).at
   return c.spots[p.spot]!.at
 }
 
@@ -591,7 +639,7 @@ export function stepCrowd(c: Crowd, now: number, grid: NavGrid, view?: View): At
     if (p.task === 'standUp' && t >= CROWD.sitTime) {
       p.task = 'walk'
       p.since = now
-    } else if (p.task === 'walk' && t * CROWD.walkSpeed >= p.length) {
+    } else if (p.task === 'walk' && walkTime(p, now) * CROWD.walkSpeed >= p.length) {
       p.spot = p.to
       p.to = -1
       p.since = now

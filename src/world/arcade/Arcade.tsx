@@ -7,6 +7,7 @@ import type { ArcadeTexts } from '@/content/schema'
 import { useExperience } from '@/experience/store'
 import { coffeeTalk } from '../coffee/coffeeModel'
 import { cutsceneNow } from '../cutscene/cutsceneModel'
+import { photoBusy } from '../photo/photoState'
 import { ON_SURFACE } from '../depthOffset'
 import type { WorldLayout } from '../layout'
 import type { ArcadeCabinet, Office } from '../officeModel'
@@ -155,7 +156,7 @@ export function Arcade({
     const x = useExperience.getState()
     const cutscene = cutsceneNow.phase !== 'idle' && cutsceneNow.phase !== 'done'
     // Not while the camera flies into the monitor (E5): one screen at a time.
-    if (x.portal.phase !== 'idle' || x.arrival || cutscene || coffeeTalk.on || useMonitor.getState().phase !== 'idle') {
+    if (x.portal.phase !== 'idle' || x.arrival || cutscene || coffeeTalk.on || useMonitor.getState().phase !== 'idle' || photoBusy()) {
       s.current.why = 'busy'
       return
     }

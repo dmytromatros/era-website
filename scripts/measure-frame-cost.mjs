@@ -75,6 +75,15 @@ try {
       await sleep(5000)
       results[q][u] = await evaluate(`(document.querySelector('[data-debug-stats]')?.textContent || 'none') + ' | handover=' + document.documentElement.hasAttribute('data-handover') + ' | at=' + (scrollY / (document.documentElement.scrollHeight - innerHeight) * ${TOTAL}).toFixed(2)`)
     }
+    // The photo mode (E7) at the first stop: the cost while the phone is up, then whether a
+    // picture came out. (Software rendering is slow: the scene clock, and so the countdown, too.)
+    await scrollTo(points[0])
+    await sleep(5000)
+    const took = await evaluate(`window.__eraPhoto?.take() ?? 'no __eraPhoto'`)
+    await sleep(2000)
+    results[q][`photo@${points[0]}`] = await evaluate(`(document.querySelector('[data-debug-stats]')?.textContent || 'none') + ' | took=' + ${JSON.stringify(String(took))} + ' | phase=' + window.__eraPhoto?.state().phase`)
+    await sleep(8000)
+    results[q].picture = await evaluate(`(() => { const p = window.__eraPhoto?.state().picture; return p ? p.width + 'x' + p.height + ' ' + Math.round(p.blob.size / 1024) + ' KB' : 'none (' + window.__eraPhoto?.state().phase + ')' })()`)
   }
   console.log(JSON.stringify(results, null, 1))
   ws.close()

@@ -9,3 +9,5 @@ accessories: [badge]
 reactions:
   - { move: dance, emoji: "🤝" }
   - { move: jump, emoji: "🎉" }
+# Photo mode (E7).
+pose: { move: flex, emoji: "😎" }

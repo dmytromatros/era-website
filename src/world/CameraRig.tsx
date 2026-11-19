@@ -7,6 +7,7 @@ import { PORTAL_TIMING } from '@/experience/portal'
 import { live, useExperience } from '@/experience/store'
 import { arcadeWeight, useArcade } from './arcade/arcadeState'
 import { monitorWeight, useMonitor } from './monitor/monitorState'
+import { photoBusy } from './photo/photoState'
 import { accentAt, cameraFocus, dollyFov, dollyPosition } from './cinema'
 import { ATTENTION, attention, attentionWeight, cameraStill, glanceZoom, STILL_AFTER } from './crowd/attention'
 import { cutsceneNow } from './cutscene/cutsceneModel'
@@ -106,7 +107,12 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
     const monW = arcW > 0 ? 0 : monitorWeight()
     const arc = arcW || monW
     const free =
-      t.entrance >= 1 && portal.phase === 'idle' && arc === 0 && (cutsceneNow.phase === 'idle' || cutsceneNow.phase === 'done')
+      t.entrance >= 1 &&
+      portal.phase === 'idle' &&
+      arc === 0 &&
+      // Holding still for the photo (E7): no glance at a gag mid-countdown.
+      !photoBusy() &&
+      (cutsceneNow.phase === 'idle' || cutsceneNow.phase === 'done')
     // Standing or scrolling? (From the shown progress, rule 1.) Scrolling again mid-glance eases it out.
     if (Math.abs(live.progress - cameraStill.last) > 1e-5 || !Number.isFinite(cameraStill.last)) cameraStill.since = clock.elapsedTime
     cameraStill.last = live.progress

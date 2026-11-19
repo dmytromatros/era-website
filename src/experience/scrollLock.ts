@@ -5,7 +5,8 @@
  * move the page (window.scrollTo works). Clicks keep working: the coffee's buttons, the header.
  *
  * Several owners may hold it (E3): the entrance `cutscene`, the `arcade` (the visitor is inside the
- * machine) and the `monitor` (E5: the camera flies into it, back to the top of the page). Each lets go of its own hold only, so the cutscene letting go every frame does not
+ * machine), the `monitor` (E5: the camera flies into it, back to the top of the page) and the
+ * `photo` (E7: the countdown, ~2 s). Each lets go of its own hold only, so the cutscene letting go every frame does not
  * free the arcade's. The cinema bars (`html[data-cutscene]`) are the cutscene's alone; the page
  * stops scrolling under `html[data-scroll-lock]`.
  *
@@ -15,7 +16,7 @@
 const KEYS = new Set([' ', 'Spacebar', 'PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End'])
 export const SAFETY_MS = 60_000
 
-export type LockOwner = 'cutscene' | 'arcade' | 'monitor'
+export type LockOwner = 'cutscene' | 'arcade' | 'monitor' | 'photo'
 
 const holds = new Set<LockOwner>()
 let safety = 0

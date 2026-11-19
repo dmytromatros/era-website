@@ -81,13 +81,19 @@ export interface QualitySettings {
    * memory and how crisp the page is at the end of the flight into it.
    */
   monitorScreen: number
+  /**
+   * The photo mode (E7): the visitor's hand raises a phone whose screen is a window onto the
+   * office (+3 draw calls for ~3 s per photo, the hands' own program). Off = the countdown, the
+   * poses, the flash and the polaroid only.
+   */
+  photoHand: boolean
 }
 
 /** What each level costs. New effects add their switches here. */
 export const QUALITY: Record<QualityName, QualitySettings> = {
-  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, physicsHz: 30, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10, waves: 0, shards: 16, walkHands: false, crowd: 5, arcadeFps: 0, arcadeGameFps: 15, letterKnock: true, daylight: true, monitorScreen: 400 },
-  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0, waves: 160, shards: 28, walkHands: true, crowd: 12, arcadeFps: 10, arcadeGameFps: 30, letterKnock: true, daylight: true, monitorScreen: 600 },
-  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 16, portalScale: 1, portalMaxFps: 0, waves: 256, shards: 40, walkHands: true, crowd: 20, arcadeFps: 12, arcadeGameFps: 30, letterKnock: true, daylight: true, monitorScreen: 900 },
+  low: { dpr: 1, multisampling: 0, outlines: false, liveDetails: false, kineticText: true, actorLife: true, physicsHz: 30, depthBlur: 0, portalScale: 0.4, portalMaxFps: 10, waves: 0, shards: 16, walkHands: false, crowd: 5, arcadeFps: 0, arcadeGameFps: 15, letterKnock: true, daylight: true, monitorScreen: 400, photoHand: false },
+  medium: { dpr: 1.25, multisampling: 2, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 8, portalScale: 0.6, portalMaxFps: 0, waves: 160, shards: 28, walkHands: true, crowd: 12, arcadeFps: 10, arcadeGameFps: 30, letterKnock: true, daylight: true, monitorScreen: 600, photoHand: true },
+  high: { dpr: 1.75, multisampling: 4, outlines: true, liveDetails: true, kineticText: true, actorLife: true, physicsHz: 60, depthBlur: 16, portalScale: 1, portalMaxFps: 0, waves: 256, shards: 40, walkHands: true, crowd: 20, arcadeFps: 12, arcadeGameFps: 30, letterKnock: true, daylight: true, monitorScreen: 900, photoHand: true },
 }
 
 const STORAGE_KEY = 'era-quality'

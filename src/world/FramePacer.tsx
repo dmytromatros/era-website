@@ -20,6 +20,7 @@ import { useXRay } from './xrayState'
 import { useArcade } from './arcade/arcadeState'
 import { useDaylight } from './daylight/daylightChoice'
 import { useMonitor } from './monitor/monitorState'
+import { photoCapture, usePhoto } from './photo/photoState'
 
 export function FramePacer() {
   const get = useThree((s) => s.get)
@@ -49,6 +50,11 @@ export function FramePacer() {
       if (pacer.membraneOnly) camera.layers.set(MEMBRANE_LAYER)
       else camera.layers.set(0)
       get().advance(clock)
+      // The photo mode (E7): the frame just drawn is read back in this very task (photoState.ts).
+      if (photoCapture.want) {
+        photoCapture.want = false
+        photoCapture.take?.(get().gl.domElement)
+      }
     }
     raf = requestAnimationFrame(tick)
 
@@ -62,6 +68,7 @@ export function FramePacer() {
       useArcade.subscribe(wake),
       useDaylight.subscribe(wake),
       useMonitor.subscribe(wake),
+      usePhoto.subscribe(wake),
     ]
     const events = ['scroll', 'resize', 'visibilitychange'] as const
     for (const e of events) window.addEventListener(e, wake, { passive: true })

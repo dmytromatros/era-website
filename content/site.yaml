@@ -58,3 +58,15 @@ arcade:
 monitor:
   en:
     comeCloser: "Come closer"
+
+# The photo mode (wow-plan E7): a header button in 3D. The visitor's hand raises a phone, a
+# countdown runs, everyone in the frame turns and poses, click — the picture comes out as a
+# comic polaroid with the caption below; "Save" downloads the PNG (on a phone: the share sheet).
+photo:
+  en:
+    button: "Selfie"
+    cheese: "Cheese!"
+    caption: "Greetings from the DFRNC office"
+    save: "Save"
+    share: "Share"
+    close: "Close"

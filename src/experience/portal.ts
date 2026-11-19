@@ -14,6 +14,7 @@
 import { isInternal } from '@/lib/href'
 import { leaveArcade } from '@/world/arcade/arcadeState'
 import { resetMonitor } from '@/world/monitor/monitorState'
+import { cancelPhoto } from '@/world/photo/photoState'
 import { live, useExperience } from './store'
 
 export const PORTAL_TIMING = {
@@ -47,6 +48,8 @@ export function portalTo(
   leaveArcade()
   // Mid-flight into the monitor (E5): that flight is off, the scroll free again.
   resetMonitor()
+  // Mid-countdown (E7): no picture, the scroll free again.
+  cancelPhoto()
   s.setPortal('diving', {
     target: opts.target ?? null,
     origin: opts.origin ?? { x: live.pointerUv.x, y: 1 - live.pointerUv.y },

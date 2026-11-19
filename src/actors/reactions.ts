@@ -7,6 +7,7 @@
  * Content picks moves per character (`reactions:` in content/actors/*.yaml).
  */
 import type { ReactionName } from './catalog'
+import { PHOTO } from '@/world/photo/photoModel'
 import { envelope } from './lifeModel'
 import type { Joints } from './rig'
 
@@ -37,6 +38,58 @@ function hop(k: number, height: number): number {
   const a = (k - 0.65) / 0.35
   return -Math.sin(a * Math.PI) * 0.06 // soft landing
 }
+
+/**
+ * The photo poses (E7): struck in the first 18 % of `PHOTO.pose`, held facing the camera through
+ * the countdown and the shutter, then let go. A wide grin and a lean into the picture; with the
+ * hands busy (holding the headline up) the grin and a tilt of the head are the whole pose.
+ */
+function photoFace(j: Joints, w: number, tilt: number) {
+  j.mouth.scale.x = lerp(1, 1.7, w)
+  j.head.rotation.z = lerp(j.head.rotation.z, tilt, w)
+  j.eyes.scale.y = lerp(1, 0.75, w) // a happy squint
+}
+
+export const photoReactions = {
+  /** Thumb up at the camera, the other hand on the hip. */
+  thumbs: {
+    duration: PHOTO.pose,
+    animate: (j, _k, w, { handsBusy }) => {
+      photoFace(j, w, -0.14)
+      j.root.rotation.z += w * 0.05
+      if (handsBusy) return
+      j.armR.rotation.set(lerp(j.armR.rotation.x, -1.15, w), 0, lerp(j.armR.rotation.z, 0.35, w))
+      j.foreR.rotation.x = lerp(j.foreR.rotation.x, -1.25, w)
+      j.armL.rotation.set(lerp(j.armL.rotation.x, 0.15, w), 0, lerp(j.armL.rotation.z, -0.75, w))
+      j.foreL.rotation.set(lerp(j.foreL.rotation.x, -1.5, w), 0, lerp(j.foreL.rotation.z, 0.9, w))
+    },
+  },
+  /** "V" up by the head, head tilted towards it. */
+  peace: {
+    duration: PHOTO.pose,
+    animate: (j, _k, w, { handsBusy }) => {
+      photoFace(j, w, 0.2)
+      j.torso.rotation.z = lerp(j.torso.rotation.z, 0.06, w)
+      if (handsBusy) return
+      j.armR.rotation.set(lerp(j.armR.rotation.x, -0.35, w), 0, lerp(j.armR.rotation.z, 2.55, w))
+      j.foreR.rotation.x = lerp(j.foreR.rotation.x, -0.9, w)
+      j.armL.rotation.z = lerp(j.armL.rotation.z, -0.2, w)
+    },
+  },
+  /** Both arms up, biceps flexed, knees a little bent. */
+  flex: {
+    duration: PHOTO.pose,
+    animate: (j, _k, w, { handsBusy }) => {
+      photoFace(j, w, -0.08)
+      j.root.position.y -= w * 0.04
+      if (handsBusy) return
+      j.armL.rotation.set(0, 0, lerp(j.armL.rotation.z, -1.5, w))
+      j.armR.rotation.set(0, 0, lerp(j.armR.rotation.z, 1.5, w))
+      j.foreL.rotation.z = lerp(j.foreL.rotation.z, -1.75, w)
+      j.foreR.rotation.z = lerp(j.foreR.rotation.z, 1.75, w)
+    },
+  },
+} satisfies Record<'thumbs' | 'peace' | 'flex', Reaction>
 
 export const reactions: Record<ReactionName, Reaction> = {
   /** Crouch, jump with the arms up, land softly. */
@@ -131,6 +184,7 @@ export const reactions: Record<ReactionName, Reaction> = {
       }
     },
   },
+  ...photoReactions,
 }
 
 /** Weight of a reaction `age` seconds after it started (0 when over). */

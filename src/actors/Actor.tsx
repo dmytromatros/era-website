@@ -29,6 +29,7 @@ import {
   wobbleAtRest,
 } from './lifeModel'
 import { reactions, reactionWeight } from './reactions'
+import { PHOTO, PHOTO_EMOJI_DELAY, photoCue, photoPoseFor, photoTurn, takesCue, turnBetween } from '@/world/photo/photoModel'
 import { BODY, EYES, resetPose, resolveJoints, type Joints } from './rig'
 
 /** Its element relative to the feet (exhibit layout): hands reach for it by IK. */
@@ -184,6 +185,8 @@ const _m = new THREE.Matrix4()
 const _q = new THREE.Quaternion()
 const _q2 = new THREE.Quaternion()
 const _ray = new THREE.Raycaster()
+/** The camera in the character's parent space (E7: turning to the lens). */
+const _lens = new THREE.Vector3()
 const _x = new THREE.Vector3()
 const _y = new THREE.Vector3()
 const _z = new THREE.Vector3()
@@ -345,6 +348,9 @@ export function Actor({ def, activity, attentive, talking, target, hitKey, drive
     clicked: false,
     wasHit: false,
     reaction: null as ReactionPlay | null,
+    /** The photo mode (E7): the last cue taken, and until when the pose holds (scene s). */
+    photoSeen: 0,
+    posingUntil: -Infinity,
     /** Previous frame, for velocities of the accessory mounts. */
     prev: { head: new THREE.Euler(), torso: new THREE.Euler(), y: 0, ready: false },
   })
@@ -435,6 +441,27 @@ export function Actor({ def, activity, attentive, talking, target, hitKey, drive
       emoji.start = now
       drive.cue = null
     }
+    // The visitor's camera is up (E7): in the frame on the cue → strike the pose, face the lens.
+    if (takesCue(s.photoSeen, now)) {
+      s.photoSeen = photoCue.id
+      const pose = photoPoseFor(def)
+      s.reaction = { name: pose.move, start: now }
+      s.posingUntil = now + PHOTO.pose
+      emoji.emoji = pose.emoji
+      emoji.start = now + PHOTO_EMOJI_DELAY // in the air when the shutter clicks
+    }
+    const posing = now < s.posingUntil
+    // …turning the whole body round to the lens and, after the click, back as they stood (not
+    // the one holding the headline up: his hands stay on it, only the head turns).
+    if (posing && !handsUp && j.root.parent) {
+      const w = photoTurn(now - (s.posingUntil - PHOTO.pose))
+      if (w > 0) {
+        j.root.parent.updateWorldMatrix(true, false)
+        j.root.parent.worldToLocal(_lens.copy(camera.position))
+        const want = Math.atan2(_lens.x - j.root.position.x, _lens.z - j.root.position.z)
+        j.root.rotation.y += turnBetween(j.root.rotation.y, want) * w
+      }
+    }
     // Click → next reaction of the cycle (or "annoyed") and its emoji; a prop hit → `hit`.
     if (s.clicked || s.wasHit) {
       const r = s.wasHit
@@ -457,7 +484,7 @@ export function Actor({ def, activity, attentive, talking, target, hitKey, drive
     const lively = life && (attentive || reaction !== null)
 
     // Look at the visitor: the camera, or the cursor while it moves nearby (mouse only).
-    s.attention += ((attentive ? 1 : 0) - s.attention) * (1 - Math.exp(-dt * 4))
+    s.attention += ((attentive || posing ? 1 : 0) - s.attention) * (1 - Math.exp(-dt * (posing ? 7 : 4)))
     if (pointer.x !== s.pointer.x || pointer.y !== s.pointer.y) {
       if (!Number.isNaN(s.pointer.x)) s.pointerMovedAt = now
       s.pointer.copy(pointer)
@@ -465,7 +492,7 @@ export function Actor({ def, activity, attentive, talking, target, hitKey, drive
     const handsBusy = act.reach === 'hold'
     if (s.attention > 0.001) {
       j.root.updateWorldMatrix(true, false)
-      const cursor = lively && canHover() && now - s.pointerMovedAt < LOOK.cursorMemory
+      const cursor = lively && !posing && canHover() && now - s.pointerMovedAt < LOOK.cursorMemory
       if (cursor) {
         // The point under the cursor at the head's distance from the camera.
         j.root.localToWorld(camLocal.set(0, HEAD_Y, 0))
@@ -560,6 +587,8 @@ export function Actor({ def, activity, attentive, talking, target, hitKey, drive
 
     // Talk.
     j.mouth.scale.y = talking ? 0.6 + Math.abs(Math.sin(t * 16)) * 1.8 : 0.6
+    // Posing for the photo (E7): a big open grin.
+    if (posing && reaction) j.mouth.scale.y = THREE.MathUtils.lerp(j.mouth.scale.y, 1.7, reaction.w)
 
     // Accessories on springs: driven by how fast the head / torso turn and the body bobs.
     const p = s.prev

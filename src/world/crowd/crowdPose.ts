@@ -8,7 +8,8 @@
  */
 import type { Vec3 } from '../layout'
 import { alongPath } from './navGrid'
-import { burstTime, CROWD, JOLT, LOSE, MEET, meetTime, reactTime, type Crowd, type Person, type Reaction } from './crowdModel'
+import { burstTime, CROWD, JOLT, LOSE, MEET, meetTime, reactTime, walkHalt, walkTime, type Crowd, type Person, type Reaction } from './crowdModel'
+import { turnBetween } from '../photo/photoModel'
 
 export interface Pose {
   /** Floor point under the hips, facing, and how far the body is raised / lowered (m). */
@@ -355,6 +356,19 @@ export function onSpinningChair(pose: Pose, pivot: Vec3, angle: number, speed: n
   }
 }
 
+/**
+ * E7: turned `w` of the way round to face the camera at `eye` — standing people on the spot,
+ * someone at a desk on their swivel chair (round its stem, `pivot`). w = 0: exactly as they were.
+ */
+export function turnToCamera(pose: Pose, eye: Vec3, w: number, pivot?: Vec3): Pose {
+  if (w <= 0 || pose.lieX !== 0) return pose
+  const from = pivot ?? pose.at
+  const want = Math.atan2(eye[0] - from[0], eye[2] - from[2])
+  const angle = turnBetween(pose.yaw, want) * w
+  if (pivot) return onSpinningChair(pose, pivot, angle, 0)
+  return { ...pose, yaw: pose.yaw + angle }
+}
+
 /** A click reaction over any pose (u seconds in); seated people stay seated (no jump). */
 function reacting(base: Joints, u: number, kind: Reaction, seated: boolean): Joints {
   const T = reactTime(kind)
@@ -380,6 +394,19 @@ function reacting(base: Joints, u: number, kind: Reaction, seated: boolean): Joi
       r = { ...base, lift: base.lift - 0.08, torsoX: 0.8 - peek * 0.45, headX: 0.5 - peek * 0.75, armLX: -2.3, armRX: -2.3, armLZ: 0.2, armRZ: -0.2, foreL: -0.7, foreR: -0.7 }
       break
     }
+    // The photo poses (E7): held through the countdown, a lean into the picture.
+    case 'thumbs':
+      // Thumb up; the other arm hangs loose along the body (a hand on the hip read as a broken arm, Dima 2026-11-19).
+      r = { ...base, armRX: -1.2, armRY: 0, armRZ: 0.35, foreR: -1.3, armLX: 0, armLZ: -0.12, foreL: -0.15, torsoZ: 0.05, headX: -0.05 }
+      break
+    case 'peace':
+      r = { ...base, armRX: -0.3, armRY: 0, armRZ: 2.55, foreR: -0.9, armLZ: -0.15, torsoZ: -0.06, headX: -0.08 }
+      break
+    case 'cheer':
+      r = seated
+        ? { ...base, armLZ: -2.5, armRZ: 2.5, armLX: 0, armRX: 0, foreL: -0.3, foreR: -0.3, headX: -0.15 }
+        : { ...base, armLZ: -2.5, armRZ: 2.5, armLX: 0, armRX: 0, foreL: -0.3, foreR: -0.3, headX: -0.15, lift: base.lift + Math.max(0, Math.sin(u * 7)) * 0.04 }
+      break
     case 'shrug':
       r = { ...base, armLZ: -0.6, armRZ: 0.6, armLX: -0.4, armRX: -0.4, foreL: -1.7, foreR: -1.7, headX: 0.15, headY: Math.sin(u * 4) * 0.3, torsoZ: 0.05 }
       break
@@ -391,7 +418,7 @@ function reacting(base: Joints, u: number, kind: Reaction, seated: boolean): Joi
  * E2d: where to turn the head to look at the guest passing by (the camera at `eye`): yaw and
  * pitch for the head, and how much (0…1: near, and not behind their back). The caller eases it.
  */
-export function lookAtGuest(pose: Pose, eye: Vec3): { yaw: number; pitch: number; weight: number } {
+export function lookAtGuest(pose: Pose, eye: Vec3, posing = false): { yaw: number; pitch: number; weight: number } {
   if (pose.lieX !== 0) return { yaw: 0, pitch: 0, weight: 0 }
   const dx = eye[0] - pose.at[0]
   const dz = eye[2] - pose.at[2]
@@ -400,7 +427,8 @@ export function lookAtGuest(pose: Pose, eye: Vec3): { yaw: number; pitch: number
   while (yaw > Math.PI) yaw -= Math.PI * 2
   while (yaw < -Math.PI) yaw += Math.PI * 2
   const behind = 1 - smooth((Math.abs(yaw) - 1.3) / 0.4)
-  const near = 1 - smooth((d - 4) / 4)
+  // Posing for the photo (E7), anyone in the frame looks into the lens, however far.
+  const near = posing ? 1 : 1 - smooth((d - 4) / 4)
   const head = pose.at[1] + 1.5 + pose.lift
   return {
     yaw: Math.max(-1.05, Math.min(1.05, yaw)),
@@ -536,10 +564,10 @@ function basePose(c: Crowd, i: number, now: number): Pose {
       return { at: [from[0] + (to[0] - from[0]) * k, from[1], from[2] + (to[2] - from[2]) * k], yaw, ...j, headX: j.headX + 0.05 }
     }
     case 'walk': {
-      const d = (now - p.since) * CROWD.walkSpeed
+      const d = walkTime(p, now) * CROWD.walkSpeed
       const { at, yaw } = alongPath(p.path, d)
-      // Ease into and out of the walk over the first / last half metre.
-      const k = Math.min(smooth(d / 0.5), smooth((p.length - d) / 0.5))
+      // Ease into and out of the walk over the first / last half metre; halted for a photo (E7): standing.
+      const k = Math.min(smooth(d / 0.5), smooth((p.length - d) / 0.5)) * (1 - walkHalt(p, now))
       return { at, yaw, ...mix(ZERO, walking(d), k) }
     }
   }

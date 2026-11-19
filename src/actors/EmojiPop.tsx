@@ -65,10 +65,12 @@ export function EmojiPop({ show, x, y, first }: Props) {
   useFrame(({ clock, camera }) => {
     const m = mesh.current
     if (!m) return
-    const state = show.emoji ? emojiState(clock.elapsedTime - show.start) : null
+    const age = clock.elapsedTime - show.start
+    const state = show.emoji ? emojiState(age) : null
     if (!state?.visible) {
       if (m.visible) m.visible = false
-      if (show.emoji && state && !state.visible) show.emoji = null
+      // Over: let it go. Not yet (a pop timed ahead, the photo's E7): keep it.
+      if (show.emoji && state && age >= 0) show.emoji = null
       return
     }
     const map = emojiTexture(show.emoji!)

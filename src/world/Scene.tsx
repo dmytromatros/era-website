@@ -18,6 +18,7 @@ import { setHtmlPortal } from './htmlPortal'
 import { SceneContent } from './SceneContent'
 import styles from './Scene.module.css'
 import { ArcadeExit } from './arcade/ArcadeExit'
+import { PhotoOverlay } from './photo/PhotoOverlay'
 
 /** The persistent 3D canvas. Mounted once per visit (lives in the locale layout). */
 /** Cinema bars and the "scroll to continue" hint of the entrance cutscene (CSS only, see the module). */
@@ -84,6 +85,8 @@ export function Scene() {
       </div>
       {/* Outside the aria-hidden canvas: a real button (the way out of the arcade, E3). */}
       <ArcadeExit />
+      {/* The photo mode (E7): countdown, flash, the polaroid card. */}
+      <PhotoOverlay />
     </>
   )
 }

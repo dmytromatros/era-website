@@ -51,6 +51,8 @@ export default async function Page({ params }: PageProps<'/[locale]/[[...slug]]'
         cutscene: site.cutscene?.[locale],
         arcade: site.arcade?.[locale],
         monitor: site.monitor?.[locale],
+        photo: site.photo?.[locale],
+        siteName: site.name,
       }}
     />
   )

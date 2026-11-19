@@ -1,7 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
-import type { ActorDef, ArcadeTexts, CutsceneTexts, MonitorTexts, Page, Welcome } from '@/content/schema'
+import type { ActorDef, ArcadeTexts, CutsceneTexts, MonitorTexts, Page, PhotoTexts, Welcome } from '@/content/schema'
 import type { PageElements } from './measure'
 
 /** What the current route hands to the persistent 3D canvas. Plain data, no JSX. */
@@ -26,6 +26,10 @@ export interface SceneData {
   arcade?: ArcadeTexts
   /** The monitor's texts (E5); absent = no monitor. */
   monitor?: MonitorTexts
+  /** The photo mode's texts (E7); absent = no photo button. */
+  photo?: PhotoTexts
+  /** The site's name (the polaroid's logo, E7). */
+  siteName?: string
 }
 
 /**

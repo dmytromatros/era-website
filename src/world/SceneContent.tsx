@@ -23,6 +23,7 @@ import { Cutscene } from './cutscene/Cutscene'
 import { LazyCrowd } from './crowd/LazyCrowd'
 import { LazyArcade } from './arcade/LazyArcade'
 import { LazyMonitor } from './monitor/LazyMonitor'
+import { LazyPhoto } from './photo/LazyPhoto'
 import { Settle } from './Settle'
 import { HeroTransit, type TransitItem } from './HeroTransit'
 import type { KineticOptions } from './KineticText'
@@ -208,6 +209,8 @@ export function SceneContent({ scene }: { scene: SceneData }) {
       <LazyArcade office={world.office} layout={world.layout} timing={timing} texts={scene.arcade} accent={style.accent} />
       {/* The monitor showing the landing (E5): click it to fly in — and you are back at the top of the 2D page. */}
       <LazyMonitor office={world.office} layout={world.layout} timing={timing} texts={scene.monitor} />
+      {/* The photo mode (E7): the hand with the phone, mounted only while a photo is taken. */}
+      <LazyPhoto texts={scene.photo} site={scene.siteName ?? 'DFRNC'} page={scene.page.title} accent={style.accent} />
       {/* Floating shapes are off inside the office (perPoint 0); raise it to bring them back. */}
       <Decor rail={world.layout.rail} clearance={world.layout.corridorHalfWidth} perPoint={0} />
       <HeroTransit items={world.transit} k={k} viewport={size} sceneKey={scene.key} />

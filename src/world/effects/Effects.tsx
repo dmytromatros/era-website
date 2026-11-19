@@ -92,7 +92,8 @@ export function Effects() {
   })
 
   return (
-    <EffectComposer multisampling={multisampling}>
+    // A stencil in the scene's target: the phone's screen in the photo mode (E7) is a hole cut with it.
+    <EffectComposer multisampling={multisampling} stencilBuffer>
       {blur ? <primitive object={blur} /> : <></>}
       {preset.post ? <primitive object={style} /> : <></>}
       <primitive object={ripple} />
