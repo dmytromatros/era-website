@@ -9,6 +9,7 @@ import { useThemeStore } from '@/theme/store'
 import { planTiming, routePlan } from '@/world/route'
 import { ENTRANCE, scrollToUnits, totalUnits } from '@/world/timeline'
 import { measurePage } from './measure'
+import { canvasHeight } from './viewport'
 import { PORTAL_TIMING, reveal } from './portal'
 import { live, selectReady, useExperience, type SceneData } from './store'
 import styles from './PageView.module.css'
@@ -54,11 +55,26 @@ export function PageView({ scene }: { scene: SceneData }) {
     // Again once CSS colour transitions (theme switch, 0.3 s) have finished — measuring mid-way
     // would freeze a half-faded colour into the 3D copy.
     const late = window.setTimeout(run, 450)
-    window.addEventListener('resize', run)
+    // A resize only when the canvas's size changed: a phone's address bar showing / hiding changes
+    // `innerHeight` alone, and re-measuring then rebuilt the whole world (experience/viewport.ts).
+    let size = ''
+    let resized = 0
+    const onResize = () => {
+      cancelAnimationFrame(resized)
+      resized = requestAnimationFrame(() => {
+        const now = `${window.innerWidth}x${canvasHeight()}`
+        if (now === size) return
+        size = now
+        useExperience.getState().setElements(scene.key, measurePage(root))
+      })
+    }
+    size = `${window.innerWidth}x${canvasHeight()}`
+    window.addEventListener('resize', onResize)
     return () => {
       cancelAnimationFrame(frame)
+      cancelAnimationFrame(resized)
       window.clearTimeout(late)
-      window.removeEventListener('resize', run)
+      window.removeEventListener('resize', onResize)
     }
   }, [mode, scene.key, theme])
 

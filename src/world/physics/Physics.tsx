@@ -24,6 +24,7 @@ import { timeline } from '../timeline'
 import { StyledMaterial } from '../toonMaterial'
 import { crowdColliders, MAX_CROWD_COLLIDERS, POSE_FLOATS, type ActorCollider, type FromWorker, type ToWorker } from './protocol'
 import type { PropBody, StaticShape } from './propsModel'
+import { canvasHeight } from '@/experience/viewport'
 
 /** Live numbers for the X-ray panel. */
 export const physicsStats = { state: 'off' as 'off' | 'loading' | 'on', bodies: 0, awake: 0, ms: 0, impacts: 0, hits: 0 }
@@ -267,7 +268,7 @@ export function Physics({ bodies, statics, actors, actorKeys, wakeRail, timing, 
         return bodies.map((b, i) => {
           const o = i * POSE_FLOATS + 7
           const p = new THREE.Vector3(pose[o]!, pose[o + 1]!, pose[o + 2]!).project(cam)
-          return { kind: b.kind, x: ((p.x + 1) / 2) * innerWidth, y: ((1 - p.y) / 2) * innerHeight, inView: Math.abs(p.x) < 1 && Math.abs(p.y) < 1 && p.z < 1 }
+          return { kind: b.kind, x: ((p.x + 1) / 2) * innerWidth, y: ((1 - p.y) / 2) * canvasHeight(), inView: Math.abs(p.x) < 1 && Math.abs(p.y) < 1 && p.z < 1 }
         })
       },
     }

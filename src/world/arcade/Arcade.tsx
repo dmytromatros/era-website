@@ -21,6 +21,7 @@ import { useMonitor } from '../monitor/monitorState'
 import { arcadeArrived, arcadeLeft, arcadeLink, enterArcade, leaveArcade, resetArcade, useArcade } from './arcadeState'
 import type { ArcadeGame } from './games/types'
 import { COLORS, drawAttract, drawBanner, drawDemo, makeCrt, SCREEN } from './screenDraw'
+import { canvasHeight } from '@/experience/viewport'
 
 /** The game slot (E3): its own chunk, fetched when the pointer is over the screen or on the click. */
 const loadGame = () => import('./games/comingSoon').then((m) => m.comingSoon as ArcadeGame<unknown>)
@@ -137,7 +138,7 @@ export function Arcade({
       state: () => ({ ...useArcade.getState(), playing: arcadeLink.playing, lostAt: arcadeLink.lostAt, step: s.current.state, why: s.current.why }),
       screen: () => {
         const p = center.clone().project(camera)
-        return { x: ((p.x + 1) / 2) * innerWidth, y: ((1 - p.y) / 2) * innerHeight, inFront: p.z < 1 }
+        return { x: ((p.x + 1) / 2) * innerWidth, y: ((1 - p.y) / 2) * canvasHeight(), inFront: p.z < 1 }
       },
       /** Scroll to the stop that sees the machine best. */
       goTo: () => {

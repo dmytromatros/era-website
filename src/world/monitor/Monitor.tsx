@@ -22,6 +22,7 @@ import { useQualitySettings } from '../quality'
 import { paintCloser, paintLanding, type Area } from './landingPicture'
 import { MONITOR, monitorView, pageRect } from './monitorModel'
 import { cancelMonitor, enterMonitor, monitorArrived, monitorLeft, resetMonitor, useMonitor } from './monitorState'
+import { canvasHeight } from '@/experience/viewport'
 
 /**
  * The monitor's screen (E5): a canvas texture in front of the bezel (rule 24) with a picture of
@@ -126,7 +127,7 @@ export function Monitor({
       picture: () => ({ png: ctx.canvas.toDataURL('image/png'), area }),
       screen: () => {
         const p = center.clone().project(camera)
-        return { x: ((p.x + 1) / 2) * innerWidth, y: ((1 - p.y) / 2) * innerHeight, inFront: p.z < 1 }
+        return { x: ((p.x + 1) / 2) * innerWidth, y: ((1 - p.y) / 2) * canvasHeight(), inFront: p.z < 1 }
       },
       /** Scroll to the stop that sees the monitor best. */
       goTo: () => {

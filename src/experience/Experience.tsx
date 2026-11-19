@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { sceneKeyOf } from './portal'
 import { PortalOverlay } from './PortalOverlay'
 import { live, selectReady, useExperience } from './store'
+import { canvasHeight } from './viewport'
 
 // three.js only downloads when the 3D layer is actually used.
 const Scene = dynamic(() => import('@/world/Scene').then((m) => m.Scene), { ssr: false })
@@ -49,9 +50,11 @@ export function Experience() {
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       live.pointer.x = (e.clientX / window.innerWidth) * 2 - 1
-      live.pointer.y = -((e.clientY / window.innerHeight) * 2 - 1)
+      // The canvas's height, not the window's: on a phone it is the large viewport (viewport.ts).
+      const h = canvasHeight()
+      live.pointer.y = -((e.clientY / h) * 2 - 1)
       live.pointerUv.x = e.clientX / window.innerWidth
-      live.pointerUv.y = 1 - e.clientY / window.innerHeight
+      live.pointerUv.y = 1 - e.clientY / h
     }
     window.addEventListener('pointermove', onMove, { passive: true })
     return () => window.removeEventListener('pointermove', onMove)

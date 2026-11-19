@@ -5,6 +5,15 @@
   pointer-events: none;
 }
 
+/* The large viewport: a phone's address bar showing / hiding must not resize the canvas (that
+   rebuilt the whole world — experience/viewport.ts). With the bar shown it covers the bottom. */
+@supports (height: 100lvh) {
+  .canvas {
+    bottom: auto;
+    height: 100lvh;
+  }
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -28,7 +37,8 @@
    (html[data-cutscene-hint], until they scroll). CSS only: no frames, no draw calls. */
 .frame {
   --bar: 9vh;
-  position: absolute;
+  /* The visible viewport, not the (taller) canvas: the bottom bar stays above a phone's toolbar. */
+  position: fixed;
   inset: 0;
   pointer-events: none;
 }
