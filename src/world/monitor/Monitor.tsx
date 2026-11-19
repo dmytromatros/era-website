@@ -11,6 +11,7 @@ import { flightClear } from '../arcade/arcadeModel'
 import { coffeeTalk } from '../coffee/coffeeModel'
 import { cutsceneNow } from '../cutscene/cutsceneModel'
 import { photoBusy } from '../photo/photoState'
+import { letterBusy } from '@/experience/letter/letterState'
 import { ON_SURFACE } from '../depthOffset'
 import type { WorldLayout } from '../layout'
 import type { MonitorDesk, Office } from '../officeModel'
@@ -139,7 +140,7 @@ export function Monitor({
   function tryEnter(cam: THREE.Camera) {
     const x = useExperience.getState()
     const cutscene = cutsceneNow.phase !== 'idle' && cutsceneNow.phase !== 'done'
-    if (x.portal.phase !== 'idle' || x.arrival || cutscene || coffeeTalk.on || useArcade.getState().phase !== 'idle' || photoBusy()) {
+    if (x.portal.phase !== 'idle' || x.arrival || cutscene || coffeeTalk.on || useArcade.getState().phase !== 'idle' || photoBusy() || letterBusy()) {
       s.current.why = 'busy'
       return
     }

@@ -122,10 +122,22 @@ export function buildExhibit(specs: ElementSpec[], ids: string[], helpers: Helpe
     // Leave room above side helpers for their speech bubble.
     height: Math.max(elevation + height, sideHelpers ? BODY.height + 1.5 : placed.length ? BODY.height + 0.6 : 0),
     elevation,
-    stand: mine.some((h) => h.pose === 'holding')
-      ? null
-      : [shift - width / 2 + Math.min(0.25, width / 4), shift + width / 2 - Math.min(0.25, width / 4)],
+    stand: mine.some((h) => h.pose === 'holding') ? null : standLegs(members, minX, maxX, maxY, k, shift),
   }
+}
+
+/**
+ * The display stand's two legs (local x). Under the whole group — unless a card is what sits at
+ * the bottom: then under that card's own edges, so it stands on both legs (E9, Dima 2026-11-19:
+ * the letter card stood on one leg, the other under the wider heading above it).
+ */
+function standLegs(members: ElementSpec[], minX: number, maxX: number, maxY: number, k: number, shift: number): [number, number] {
+  const midX = (minX + maxX) / 2
+  const bottom = members.find((s) => s.kind === 'card' && Math.abs(s.y + s.height - maxY) < 1)
+  const from = bottom ? (bottom.x - midX) * k : ((minX - midX) * k)
+  const to = bottom ? (bottom.x + bottom.width - midX) * k : ((maxX - midX) * k)
+  const inset = Math.min(0.25, (to - from) / 4)
+  return [shift + from + inset, shift + to - inset]
 }
 
 /** World position of a point given in an exhibit's local frame. */

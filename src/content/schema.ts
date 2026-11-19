@@ -109,11 +109,45 @@ export const stepsBlockSchema = z.object({
   ...stage,
 })
 
+/**
+ * A letter to the studio (wow-plan E9): the form a CTA can carry. In 2D a real form; in 3D a
+ * card — click it, write on a sheet over the scene, and the helper next to it folds the sheet
+ * into a paper plane and throws it out of the window. Sending is a stub for now
+ * (experience/letter/sendMessage.ts). `oops` / `delivered`: what the helper says on the way.
+ */
+export const letterFormSchema = z.object({
+  title: z.string().min(1).max(40),
+  name: z.string().min(1).max(30),
+  email: z.string().min(1).max(30),
+  message: z.string().min(1).max(30),
+  namePlaceholder: z.string().max(40).default(''),
+  emailPlaceholder: z.string().max(40).default(''),
+  messagePlaceholder: z.string().max(80).default(''),
+  send: z.string().min(1).max(20),
+  sending: z.string().min(1).max(20),
+  cancel: z.string().min(1).max(20),
+  /** After sending (2D): a thank-you and a way to write another. */
+  sent: z.string().min(1).max(80),
+  again: z.string().min(1).max(30),
+  /** The helper, once the plane has flown off. */
+  delivered: z.string().min(1).max(80),
+  invalid: z.object({
+    name: z.string().min(1).max(60),
+    email: z.string().min(1).max(60),
+    message: z.string().min(1).max(60),
+  }),
+})
+
+export type LetterForm = z.infer<typeof letterFormSchema>
+
 export const ctaBlockSchema = z.object({
   type: z.literal('cta'),
   heading: z.string().min(1),
   text: z.string().optional(),
-  action: actionSchema,
+  /** The button; optional when the CTA carries a letter form instead. */
+  action: actionSchema.optional(),
+  /** A letter form (E9): its card is the element `letter`. */
+  form: letterFormSchema.optional(),
   ...stage,
 })
 

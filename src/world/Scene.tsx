@@ -19,6 +19,7 @@ import { SceneContent } from './SceneContent'
 import styles from './Scene.module.css'
 import { ArcadeExit } from './arcade/ArcadeExit'
 import { PhotoOverlay } from './photo/PhotoOverlay'
+import { LetterSheet } from './letter/LetterSheet'
 
 /** The persistent 3D canvas. Mounted once per visit (lives in the locale layout). */
 /** Cinema bars and the "scroll to continue" hint of the entrance cutscene (CSS only, see the module). */
@@ -87,6 +88,8 @@ export function Scene() {
       <ArcadeExit />
       {/* The photo mode (E7): countdown, flash, the polaroid card. */}
       <PhotoOverlay />
+      {/* The letter (E9): the sheet to write on over the scene, and the BONK. */}
+      <LetterSheet />
     </>
   )
 }

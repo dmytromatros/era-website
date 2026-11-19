@@ -23,7 +23,7 @@ export function elementIds(block: Block): string[] {
     case 'steps':
       return ['heading', ...range('step', block.items.length)]
     case 'cta':
-      return ['heading', ...(block.text ? ['text'] : []), 'action']
+      return ['heading', ...(block.text ? ['text'] : []), ...(block.form ? ['letter'] : []), ...(block.action ? ['action'] : [])]
     case 'door':
       return []
   }
@@ -68,6 +68,7 @@ export function referenceErrors(block: Block): string[] {
   if (block.type === 'door') return []
   const known = new Set(elementIds(block))
   const errors: string[] = []
+  if (block.type === 'cta' && !block.action && !block.form) errors.push('a CTA needs an action or a letter form')
   for (const ex of block.exhibits ?? []) {
     for (const id of ex.elements) if (!known.has(id)) errors.push(`exhibit element "${id}" does not exist`)
   }

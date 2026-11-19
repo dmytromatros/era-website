@@ -6,7 +6,8 @@
  *
  * Several owners may hold it (E3): the entrance `cutscene`, the `arcade` (the visitor is inside the
  * machine), the `monitor` (E5: the camera flies into it, back to the top of the page) and the
- * `photo` (E7: the countdown, ~2 s). Each lets go of its own hold only, so the cutscene letting go every frame does not
+ * `photo` (E7: the countdown, ~2 s) and the `letter` (E9: the sheet over the scene and the paper
+ * plane's show). Each lets go of its own hold only, so the cutscene letting go every frame does not
  * free the arcade's. The cinema bars (`html[data-cutscene]`) are the cutscene's alone; the page
  * stops scrolling under `html[data-scroll-lock]`.
  *
@@ -16,18 +17,20 @@
 const KEYS = new Set([' ', 'Spacebar', 'PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End'])
 export const SAFETY_MS = 60_000
 
-export type LockOwner = 'cutscene' | 'arcade' | 'monitor' | 'photo'
+export type LockOwner = 'cutscene' | 'arcade' | 'monitor' | 'photo' | 'letter'
 
 const holds = new Set<LockOwner>()
 let safety = 0
 
 const stop = (e: Event) => {
+  // Something that scrolls by itself over the held page (the letter's sheet, E9) keeps its scroll.
+  if ((e.target as Element | null)?.closest?.('[data-scroll-free]')) return
   if (e.cancelable) e.preventDefault()
 }
 const keys = (e: KeyboardEvent) => {
-  // Space / Enter on a focused button must still press it.
+  // Space / Enter on a focused button must still press it; typing must still type.
   const t = e.target as HTMLElement | null
-  if (t && (t.tagName === 'BUTTON' || t.tagName === 'A' || t.isContentEditable || t.tagName === 'INPUT')) return
+  if (t && (t.tagName === 'BUTTON' || t.tagName === 'A' || t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
   if (KEYS.has(e.key)) e.preventDefault()
 }
 

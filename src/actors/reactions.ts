@@ -91,6 +91,51 @@ export const photoReactions = {
   },
 } satisfies Record<'thumbs' | 'peace' | 'flex', Reaction>
 
+/**
+ * The letter's helper (E9): folding the sheet in front of the chest, the wind-up and throw of the
+ * paper plane, and a hand to the face when it hits the closed window.
+ */
+export const letterReactions = {
+  /** Both hands together in front of the chest, working the paper (small pinches in turn). */
+  fold: {
+    duration: 1.25,
+    animate: (j, k, w, { handsBusy }) => {
+      j.head.rotation.x = lerp(j.head.rotation.x, 0.35, w)
+      if (handsBusy) return
+      const pinch = Math.sin(k * Math.PI * 7)
+      j.armL.rotation.set(lerp(j.armL.rotation.x, -1.05 + pinch * 0.08, w), 0, lerp(j.armL.rotation.z, 0.32, w))
+      j.armR.rotation.set(lerp(j.armR.rotation.x, -1.05 - pinch * 0.08, w), 0, lerp(j.armR.rotation.z, -0.32, w))
+      j.foreL.rotation.x = lerp(j.foreL.rotation.x, -0.95, w)
+      j.foreR.rotation.x = lerp(j.foreR.rotation.x, -0.95, w)
+    },
+  },
+  /** Wind-up (the right arm back and up, the body turning), then the throw forward. */
+  throw: {
+    duration: 0.75,
+    animate: (j, k, w, { handsBusy }) => {
+      const back = k < 0.45 ? Math.sin((k / 0.45) * Math.PI * 0.5) : Math.cos(((k - 0.45) / 0.55) * Math.PI * 0.5)
+      const fwd = k < 0.45 ? 0 : Math.sin(((k - 0.45) / 0.55) * Math.PI)
+      j.torso.rotation.y = lerp(j.torso.rotation.y, 0.45 * back - 0.35 * fwd, w)
+      j.root.position.z += fwd * 0.06 * w
+      if (handsBusy) return
+      j.armR.rotation.set(lerp(j.armR.rotation.x, -2.6 * back - 1.4 * fwd, w), 0, lerp(j.armR.rotation.z, -0.2, w))
+      j.foreR.rotation.x = lerp(j.foreR.rotation.x, -1.3 * back, w)
+      j.armL.rotation.set(lerp(j.armL.rotation.x, -0.9 * back, w), 0, lerp(j.armL.rotation.z, 0.4, w))
+    },
+  },
+  /** "Oops": a hand to the face, the head down and shaking. */
+  facepalm: {
+    duration: 1.6,
+    animate: (j, k, w, { handsBusy }) => {
+      j.head.rotation.x = lerp(j.head.rotation.x, 0.3, w)
+      j.head.rotation.y += Math.sin(k * Math.PI * 6) * 0.18 * w
+      if (handsBusy) return
+      j.armR.rotation.set(lerp(j.armR.rotation.x, -2.35, w), 0, lerp(j.armR.rotation.z, -0.55, w))
+      j.foreR.rotation.x = lerp(j.foreR.rotation.x, -1.7, w)
+    },
+  },
+} satisfies Record<'fold' | 'throw' | 'facepalm', Reaction>
+
 export const reactions: Record<ReactionName, Reaction> = {
   /** Crouch, jump with the arms up, land softly. */
   jump: {
@@ -185,6 +230,7 @@ export const reactions: Record<ReactionName, Reaction> = {
     },
   },
   ...photoReactions,
+  ...letterReactions,
 }
 
 /** Weight of a reaction `age` seconds after it started (0 when over). */

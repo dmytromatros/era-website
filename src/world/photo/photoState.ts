@@ -14,6 +14,7 @@ import { useExperience } from '@/experience/store'
 import { cutsceneNow } from '../cutscene/cutsceneModel'
 import { useArcade } from '../arcade/arcadeState'
 import { useMonitor } from '../monitor/monitorState'
+import { letterBusy } from '@/experience/letter/letterState'
 
 export type PhotoPhase = 'idle' | 'loading' | 'shooting'
 
@@ -54,6 +55,7 @@ export function photoBlocked(): string {
   if (cutsceneNow.phase !== 'idle' && cutsceneNow.phase !== 'done') return 'cutscene'
   if (useArcade.getState().phase !== 'idle' || useMonitor.getState().phase !== 'idle') return 'screen'
   if (photoBusy()) return 'busy'
+  if (letterBusy()) return 'letter'
   return ''
 }
 

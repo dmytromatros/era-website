@@ -45,6 +45,8 @@ export interface ElementSpec extends Rect {
   widgets?: WidgetSpec[]
   /** Where the element links to in 2D (already localised), so its 3D copy can do the same. */
   href?: string
+  /** What its 3D copy does when clicked instead (`data-action`, elementActions.ts; E9: `letter`). */
+  action?: string
 }
 
 /** blockIndex → its elements */
@@ -113,6 +115,7 @@ function measureElement(el: HTMLElement): ElementSpec {
   const link = el.closest('a')
   const href = link?.getAttribute('href')
   if (href) spec.href = href
+  if (el.dataset.action) spec.action = el.dataset.action
   if (kind !== 'text') {
     const borderWidth = parseFloat(cs.borderTopWidth)
     spec.box = {

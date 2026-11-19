@@ -688,12 +688,14 @@ export function Actor({ def, activity, attentive, talking, target, hitKey, drive
             </RoundedBox>
             {palette.hair && (
               <>
+                {/* 3 cm proud of the head on every side: a face in the head's own plane fought it
+                    for depth and the hair line flickered (Dima 2026-11-19, as the crowd's in E2a). */}
                 <mesh position={[0, 0.47, -0.01]}>
-                  <boxGeometry args={[0.52, 0.1, 0.48]} />
+                  <boxGeometry args={[0.56, 0.1, 0.54]} />
                   <Mat color={palette.hair} />
                 </mesh>
-                <mesh position={[0, 0.32, -0.21]}>
-                  <boxGeometry args={[0.52, 0.32, 0.08]} />
+                <mesh position={[0, 0.32, -0.22]}>
+                  <boxGeometry args={[0.56, 0.32, 0.1]} />
                   <Mat color={palette.hair} />
                 </mesh>
               </>

@@ -8,6 +8,8 @@ import { live, useExperience } from '@/experience/store'
 import { arcadeWeight, useArcade } from './arcade/arcadeState'
 import { monitorWeight, useMonitor } from './monitor/monitorState'
 import { photoBusy } from './photo/photoState'
+import { letterBusy } from '@/experience/letter/letterState'
+import { letterCam } from './letter/letterShow'
 import { accentAt, cameraFocus, dollyFov, dollyPosition } from './cinema'
 import { ATTENTION, attention, attentionWeight, cameraStill, glanceZoom, STILL_AFTER } from './crowd/attention'
 import { cutsceneNow } from './cutscene/cutsceneModel'
@@ -112,6 +114,8 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
       arc === 0 &&
       // Holding still for the photo (E7): no glance at a gag mid-countdown.
       !photoBusy() &&
+      // Writing the letter or watching its plane (E9): no glance away either.
+      !letterBusy() &&
       (cutsceneNow.phase === 'idle' || cutsceneNow.phase === 'done')
     // Standing or scrolling? (From the shown progress, rule 1.) Scrolling again mid-glance eases it out.
     if (Math.abs(live.progress - cameraStill.last) > 1e-5 || !Number.isFinite(cameraStill.last)) cameraStill.since = clock.elapsedTime
@@ -165,13 +169,23 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
       tmpLook.lerp(tmpTarget, Math.min(1, arc * 1.35))
     }
 
+    // The letter (E9, letter/letterShow.ts): up to its card to write on it, then after the paper
+    // plane to the window and back. In real time from the click (rule 1); the fov stays (rule 27).
+    const lw = letterCam.weight
+    if (lw > 0) {
+      tmpTarget.set(...letterCam.eye)
+      tmpPos.lerp(tmpTarget, lw)
+      tmpTarget.set(...letterCam.look)
+      tmpLook.lerp(tmpTarget, Math.min(1, lw * 1.25))
+    }
+
     camera.position.copy(tmpPos)
     c.lookAt.copy(tmpLook)
     camera.lookAt(c.lookAt)
 
     // Walking (D2, walkModel.ts): steps from the distance walked along the rail, a run when fast,
     // a step onto each stair, a lean into turns. None during the entrance or a portal (faded).
-    const allowed = THREE.MathUtils.smoothstep(t.entrance, 0.9, 1) * (portal.phase === 'idle' && arc === 0 ? 1 : 0)
+    const allowed = THREE.MathUtils.smoothstep(t.entrance, 0.9, 1) * (portal.phase === 'idle' && arc === 0 && lw === 0 ? 1 : 0)
     walk.weight += (allowed - walk.weight) * (1 - Math.exp(-Math.min(delta, 0.1) * 4))
     const w = stepWalk(walk.state, {
       position: [walk.rail.x, walk.rail.y, walk.rail.z],
@@ -211,6 +225,12 @@ export function CameraRig({ layout, timing, sceneKey }: { layout: WorldLayout; t
       tmpTarget.set(...arcState.look)
       cameraFocus.distance = THREE.MathUtils.lerp(cameraFocus.distance, tmpPos.distanceTo(tmpTarget), arc)
       cameraFocus.accent = Math.max(cameraFocus.accent * (1 - arc), Math.sin(Math.PI * arc) * 0.85)
+    }
+    // Following the letter (E9): focus on what the camera follows, the rest of the office soft.
+    if (lw > 0) {
+      tmpTarget.set(...letterCam.look)
+      cameraFocus.distance = THREE.MathUtils.lerp(cameraFocus.distance, tmpPos.distanceTo(tmpTarget), lw)
+      cameraFocus.accent = Math.max(cameraFocus.accent, lw * 0.7)
     }
   })
 

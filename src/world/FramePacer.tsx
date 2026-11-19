@@ -21,6 +21,7 @@ import { useArcade } from './arcade/arcadeState'
 import { useDaylight } from './daylight/daylightChoice'
 import { useMonitor } from './monitor/monitorState'
 import { photoCapture, usePhoto } from './photo/photoState'
+import { useLetter } from '@/experience/letter/letterState'
 
 export function FramePacer() {
   const get = useThree((s) => s.get)
@@ -69,6 +70,7 @@ export function FramePacer() {
       useDaylight.subscribe(wake),
       useMonitor.subscribe(wake),
       usePhoto.subscribe(wake),
+      useLetter.subscribe(wake),
     ]
     const events = ['scroll', 'resize', 'visibilitychange'] as const
     for (const e of events) window.addEventListener(e, wake, { passive: true })

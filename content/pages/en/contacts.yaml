@@ -9,16 +9,38 @@ blocks:
       - { label: dfrnc@gmail.com, href: "mailto:dfrnc@gmail.com", variant: primary }
     tags: [LINKEDIN, BEHANCE, INSTAGRAM]
 
+  # A letter to the studio (wow-plan E9): a real form in 2D; in 3D click the card — the camera
+  # flies up to it and you write on the stand itself; Leo folds the sheet into a paper plane and
+  # throws it, it loops away across the office. Sending is a stub for now
+  # (src/experience/letter/sendMessage.ts).
   - type: cta
     heading: Let us write to you
     text: Haven't submitted your application yet? Drop us a line.
-    action: { label: Write to us, href: "mailto:dfrnc@gmail.com" }
+    form:
+      title: A letter to DFRNC
+      name: Your name
+      email: Your e-mail
+      message: Your message
+      namePlaceholder: Jane Doe
+      emailPlaceholder: jane@company.com
+      messagePlaceholder: Tell us about your project…
+      send: Send
+      sending: Sending…
+      cancel: Cancel
+      sent: Delivered! We'll write back soon.
+      again: Write another
+      delivered: "Delivered! Wind does the rest."
+      invalid:
+        name: Tell us your name.
+        email: That e-mail doesn't look right.
+        message: A few words, please.
     helpers:
-      - target: action
+      - target: letter
         actor: leo
         pose: waving
         lines:
           - We answer fast. Usually faster than this bubble types.
+          - Write it down — I'll fly it over myself.
 
   - type: door
     label: Back to the start

@@ -7,6 +7,8 @@ import type * as THREE from 'three'
 import type { ElementSpec, TextStyle } from '@/experience/measure'
 import { useExperience } from '@/experience/store'
 import { isInternal } from '@/lib/href'
+import { hasElementAction, registerActionTarget, runElementAction } from '@/experience/elementActions'
+import { letterBusy } from '@/experience/letter/letterState'
 import { fontFor } from '@/theme/typography'
 import { Slab } from './Slab'
 import { useKineticText, type KineticOptions } from './KineticText'
@@ -112,7 +114,7 @@ function follow(href: string) {
  * cursor, and a small lift on hover so it reads as alive. Only once the 3D world has taken over —
  * before that the DOM button sits exactly on top and handles the click itself.
  */
-function Linked({ href, children }: { href?: string; children: ReactNode }) {
+function Linked({ href, action, size, children }: { href?: string; action?: string; size?: [number, number]; children: ReactNode }) {
   const group = useRef<THREE.Group>(null)
   const hovered = useRef(false)
   const lift = useRef(0)
@@ -123,16 +125,25 @@ function Linked({ href, children }: { href?: string; children: ReactNode }) {
     },
     [],
   )
+  // Its 3D object, for whoever runs the action (E9: the camera flies to the letter card).
+  const [sw, sh] = size ?? [0, 0]
+  useEffect(() => (action && group.current ? registerActionTarget(action, { object: group.current, width: sw, height: sh }) : undefined), [action, sw, sh])
 
   useFrame((_, delta) => {
     const g = group.current
-    if (!g || !href) return
-    lift.current += ((hovered.current ? 1 : 0) - lift.current) * (1 - Math.exp(-delta * 12))
+    if (!g || (!href && !action)) return
+    // Writing a letter on the stand (E9) or watching its plane: nothing in the world is hovered.
+    const busy = letterBusy()
+    if (busy && hovered.current) {
+      hovered.current = false
+      document.body.style.cursor = ''
+    }
+    lift.current += ((hovered.current && !busy ? 1 : 0) - lift.current) * (1 - Math.exp(-delta * 12))
     g.position.z = lift.current * 0.08
     g.scale.setScalar(1 + lift.current * 0.04)
   })
 
-  if (!href) return <>{children}</>
+  if (!href && !action) return <>{children}</>
 
   const live = () => useExperience.getState().handedOver
   return (
@@ -141,10 +152,11 @@ function Linked({ href, children }: { href?: string; children: ReactNode }) {
       onClick={(e: ThreeEvent<MouseEvent>) => {
         if (!live()) return
         e.stopPropagation()
-        follow(href)
+        if (action) runElementAction(action)
+        else if (href) follow(href)
       }}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
-        if (!live()) return
+        if (!live() || letterBusy() || (action && !hasElementAction(action))) return
         e.stopPropagation()
         hovered.current = true
         document.body.style.cursor = 'pointer'
@@ -178,7 +190,7 @@ export function ElementView({ spec, k, onSync, kinetic }: Props) {
       anchor: 'top-left',
     }
     return (
-      <Linked href={spec.href}>{kinetic ? <KineticLabel {...label} kinetic={kinetic} /> : <Label {...label} />}</Linked>
+      <Linked href={spec.href} action={spec.action} size={[w, h]}>{kinetic ? <KineticLabel {...label} kinetic={kinetic} /> : <Label {...label} />}</Linked>
     )
   }
 
@@ -191,7 +203,7 @@ export function ElementView({ spec, k, onSync, kinetic }: Props) {
   const seeThrough = /rgba\(.*,\s*0(\.\d+)?\)$/.test(box.background)
   const radius = Math.min(box.radius * k, h / 2, w / 2)
   return (
-    <Linked href={spec.href}>
+    <Linked href={spec.href} action={spec.action} size={[w, h]}>
       {border > 0 && (
         // Border = a frame around the card slab (Slab inset), side by side with it — never a
         // slab behind it: overlapping faces fight for depth on phones (grey patches).

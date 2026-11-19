@@ -2,9 +2,9 @@
 
 import { Html } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type * as THREE from 'three'
-import { Actor } from '@/actors/Actor'
+import { Actor, type ActorDrive } from '@/actors/Actor'
 import type { ActorDef } from '@/content/schema'
 import { live } from '@/experience/store'
 import { coffeeTalk } from './coffee/coffeeModel'
@@ -15,6 +15,7 @@ import { SpeechBubble } from './SpeechBubble'
 import type { Timing } from './route'
 import { timeline } from './timeline'
 import { useKeeper } from './letterFix/useKeeper'
+import { thrower, useLetterShow } from './letter/letterShow'
 import styles from './Helper.module.css'
 
 /**
@@ -62,7 +63,24 @@ export function Helper({ placed, actor, stopIndex, timing, hitKey }: Props) {
   const post = useRef<THREE.Group>(null)
   const walker = useRef<THREE.Group>(null)
   const keeper = useKeeper(walker, post, placed.helper.pose === 'holding' ? (placed.helper.grumbles ?? []) : [], actor.scale)
-  const quiet = hushed || keeper.line !== null
+  // E9: the one at the letter card folds the visitor's letter into a paper plane and throws it.
+  const throws = placed.helper.target === 'letter'
+  const throwerDrive = useMemo<ActorDrive | undefined>(() => (throws ? { walked: 0, moving: 0, offer: 0, carrying: false, cue: null } : undefined), [throws])
+  useEffect(() => {
+    if (!throws || !post.current) return
+    const anchor = post.current
+    thrower.anchor = anchor
+    thrower.drive = throwerDrive ?? null
+    thrower.scale = actor.scale
+    thrower.name = `${actor.name} · ${actor.role}`
+    return () => {
+      if (thrower.anchor !== anchor) return
+      thrower.anchor = null
+      thrower.drive = null
+    }
+  }, [throws, throwerDrive, actor.scale, actor.name, actor.role])
+  const letterLine = useLetterShow((s) => (throws ? s.line : null))
+  const quiet = hushed || keeper.line !== null || letterLine !== null
   // On narrow screens a bubble beside the character would run off the edge: dock it instead.
   const docked = useThree((s) => s.size.width < 720)
   const { helper, local, bubble, bubbleY } = placed
@@ -79,11 +97,12 @@ export function Helper({ placed, actor, stopIndex, timing, hitKey }: Props) {
           def={actor}
           activity={keeper.activity ?? helper.pose}
           attentive={attentive && keeper.atPost}
-          talking={(talking && !quiet) || keeper.line !== null}
+          talking={(talking && !quiet) || keeper.line !== null || letterLine !== null}
           target={keeper.atPost ? placed.target : undefined}
           hitKey={hitKey}
-          drive={keeper.drive}
+          drive={keeper.drive ?? throwerDrive}
         />
+        {/* His letter lines (E9) are docked by LetterSheet: the camera may be off by the window. */}
         {keeper.line && (
           <Html position={[0, bubbleY, 0]} portal={htmlPortal} zIndexRange={[20, 11]}>
             <div className={styles.anchorAbove}>

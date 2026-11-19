@@ -15,6 +15,7 @@ import { isInternal } from '@/lib/href'
 import { leaveArcade } from '@/world/arcade/arcadeState'
 import { resetMonitor } from '@/world/monitor/monitorState'
 import { cancelPhoto } from '@/world/photo/photoState'
+import { abortLetter } from './letter/letterState'
 import { live, useExperience } from './store'
 
 export const PORTAL_TIMING = {
@@ -50,6 +51,8 @@ export function portalTo(
   resetMonitor()
   // Mid-countdown (E7): no picture, the scroll free again.
   cancelPhoto()
+  // Writing a letter (E9): the sheet goes, the letter is kept for later.
+  abortLetter()
   s.setPortal('diving', {
     target: opts.target ?? null,
     origin: opts.origin ?? { x: live.pointerUv.x, y: 1 - live.pointerUv.y },

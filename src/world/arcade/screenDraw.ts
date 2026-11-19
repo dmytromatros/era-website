@@ -108,7 +108,8 @@ export function drawDemo(ctx: CanvasRenderingContext2D, t: number) {
   const W = SCREEN.w
   drawText(ctx, `1UP ${score6(1200 + t * 37)}`, 4, 4, { color: COLORS.yellow })
   // The swarm sways and a bug pops now and then (whichever the cycle picks).
-  const frame = Math.floor(t * 3) % 2
+  // Never negative (t can be, for a frame): BUG[-1] does not exist.
+  const frame = ((Math.floor(t * 3) % 2) + 2) % 2
   const sway = Math.sin(t * 0.9) * 14
   const popped = Math.floor(t / 0.7) % 18
   for (let r = 0; r < 3; r++) {

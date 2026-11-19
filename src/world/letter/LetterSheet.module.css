@@ -1,0 +1,88 @@
+/* Writing on the 3D stand (E9). The form lies exactly over the letter card on the
+   screen (top-left at the card's, scaled to its width); it fades in once the camera is there. */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  pointer-events: none;
+}
+
+.stand {
+  position: fixed;
+  transform-origin: 0 0;
+  pointer-events: auto;
+}
+
+.cancel {
+  position: fixed;
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 2px solid #141414;
+  background: #fffdf6;
+  color: #141414;
+  font: 800 14px/1 var(--font-sans);
+  cursor: pointer;
+  box-shadow: 3px 3px 0 #141414;
+  pointer-events: auto;
+  animation: in 0.25s ease 0.1s both;
+  transition: opacity 0.2s ease;
+}
+
+.cancel:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 3px;
+}
+
+.key {
+  font: 600 11px/1 var(--font-sans);
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid #c9c2b4;
+  opacity: 0.7;
+}
+
+@media (hover: none) {
+  .key {
+    display: none;
+  }
+}
+
+/* Sent: the button goes; the form stays until the 3D sheet takes its place. */
+.flying .cancel {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.flying .stand {
+  pointer-events: none;
+}
+
+:global(html[data-letter-3d]) .stand {
+  visibility: hidden;
+}
+
+@keyframes in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stand {
+    animation-duration: 0.01s;
+  }
+}
+
+/* The helper's line (E9), docked at the bottom of the screen (Helper.module.css .dock inside). */
+.lineLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 17;
+  pointer-events: none;
+}

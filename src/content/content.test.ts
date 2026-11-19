@@ -31,7 +31,7 @@ describe('content folder', () => {
         const hrefs = page.blocks.flatMap((b) => {
           if (b.type === 'door') return [b.href]
           if (b.type === 'hero') return b.actions.map((a) => a.href)
-          if (b.type === 'cta') return [b.action.href]
+          if (b.type === 'cta') return b.action ? [b.action.href] : []
           return []
         })
         for (const href of hrefs.filter((h) => h.startsWith('/'))) {

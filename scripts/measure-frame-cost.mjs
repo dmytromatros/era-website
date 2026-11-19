@@ -5,13 +5,13 @@
 // Needs the dev server on :3000 and Google Chrome in /Applications. In the Claude sandbox it
 // must run outside the sandbox (Chrome can not start inside it).
 // FPS here is software rendering — NOT representative; draw calls / triangles are.
-// Usage: npm run measure -- <width> <height>    (default 1280 800)
+// Usage: npm run measure -- <width> <height> [page]    (default 1280 800 home; page: home | contacts)
 import { spawn } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const [W = '1280', H = '800'] = process.argv.slice(2)
+const [W = '1280', H = '800', PAGE = 'home'] = process.argv.slice(2)
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const PORT = 9333
 const profile = mkdtempSync(join(tmpdir(), 'era-chrome-'))
@@ -42,9 +42,14 @@ try {
   const evaluate = async (expr) => (await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true })).result?.result?.value
 
   await send('Emulation.setDeviceMetricsOverride', { width: +W, height: +H, deviceScaleFactor: 1, mobile: +W < 768 })
-  // Rail points in scroll units (entrance = 1.6, src/world/timeline.ts ENTRANCE; the D1 hold is off).
-  const points = [2.9, 10.5, 16.2, 18.8, 21.3]
-  const TOTAL = 22.6
+  // Rail points in scroll units (entrance = 1.6, src/world/timeline.ts ENTRANCE; the D1 hold is off;
+  // key stop 1.3, other stop 0.6, transition point 0.6 — planTiming in src/world/route.ts).
+  const PAGES = {
+    home: { path: '/en', points: [2.9, 10.5, 16.2, 18.8, 21.3], total: 22.6 },
+    // hero 1.3 1.3 0.6 · stairs 0.6 0.6 · CTA (the letter, E9) 1.3 · door 1.3
+    contacts: { path: '/en/contacts', points: [2.9, 7.3], total: 8.6 },
+  }
+  const { path, points, total: TOTAL } = PAGES[PAGE] ?? PAGES.home
   const scrollTo = (u) => evaluate(`(() => { const m = document.documentElement.scrollHeight - innerHeight; scrollTo(0, m * ${u} / ${TOTAL}) })()`)
   // The entrance is a cutscene (D3, CLAUDE.md rule 41): it holds the page until the coffee is
   // answered. Play it through like a visitor — scroll into the film, say "No, thanks" — before
@@ -67,7 +72,7 @@ try {
   }
   const results = {}
   for (const q of ['high', 'medium', 'low']) {
-    await send('Page.navigate', { url: `http://localhost:3000/en?debug=1&quality=${q}` })
+    await send('Page.navigate', { url: `http://localhost:3000${path}?debug=1&quality=${q}` })
     await sleep(9000)
     results[q] = { entrance: await playEntrance() }
     for (const u of points) {
@@ -77,6 +82,7 @@ try {
     }
     // The photo mode (E7) at the first stop: the cost while the phone is up, then whether a
     // picture came out. (Software rendering is slow: the scene clock, and so the countdown, too.)
+    if (PAGE !== 'home') continue
     await scrollTo(points[0])
     await sleep(5000)
     const took = await evaluate(`window.__eraPhoto?.take() ?? 'no __eraPhoto'`)

@@ -114,3 +114,13 @@
   font-weight: 700;
   text-decoration: none;
 }
+
+/* Beside a letter form (E9) the e-mail link is the quieter way. */
+.ctaSecondary {
+  height: 48px;
+  padding: 0 22px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  font-size: 15px;
+}

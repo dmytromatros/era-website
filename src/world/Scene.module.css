@@ -18,7 +18,8 @@
    is what the picture will be (the bubbles are HTML, not in it). */
 :global(html[data-arcade]) .overlay,
 :global(html[data-monitor]) .overlay,
-:global(html[data-photo]) .overlay {
+:global(html[data-photo]) .overlay,
+:global(html[data-letter='writing']) .overlay {
   opacity: 0;
 }
 
